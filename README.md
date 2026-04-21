@@ -111,6 +111,16 @@ src/claude_atlas/
     └── templates/report.mustache
 ```
 
+## Roadmap
+
+Claude-atlas is in active evolution. See the full [ROADMAP.md](ROADMAP.md) for principles, released versions, and what's planned.
+
+**Next up: v0.4.0 — HTML triage dashboard.** The graph view becomes a secondary tab; the primary view becomes a card-based triage dashboard with health score, side-by-side previews, and per-issue actions. Follow progress in [#1](https://github.com/grippado/claude-atlas/issues/1).
+
+**Considering:** interactive fix-prompt export (`claude-atlas fix`), scan history diffing, pre-commit hook templates, editor status-bar plugin.
+
+**Won't do:** automatic editing/deletion of artifacts, cloud sync, accounts, or support for non-Claude-Code AI tools. See the [anti-roadmap](ROADMAP.md#anti-roadmap-wont-do) for why.
+
 ## Contributing
 
 PRs welcome. Before opening one:

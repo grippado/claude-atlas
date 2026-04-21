@@ -94,6 +94,16 @@ claude-atlas check --top 0 --format json
 
 Exit codes: `0` (limpo), `1` (issues encontradas no threshold), `2` (erro).
 
+## Roadmap
+
+Claude-atlas está em evolução ativa. Veja o [ROADMAP.pt-BR.md](ROADMAP.pt-BR.md) completo com princípios, versões lançadas e o que está planejado.
+
+**Próximo: v0.4.0 — HTML triage dashboard.** O graph view vira aba secundária; a view principal passa a ser um dashboard de triagem em cards, com health score, previews lado a lado e ações por issue. Acompanhe em [#1](https://github.com/grippado/claude-atlas/issues/1).
+
+**Em consideração:** export interativo de fix-prompt (`claude-atlas fix`), diff entre scans, templates de pre-commit hook, plugin de status bar pra editor.
+
+**Não vamos fazer:** edição/deleção automática de artefatos, cloud sync, accounts, nem suporte a AI tools que não sejam Claude Code. Veja o [anti-roadmap](ROADMAP.pt-BR.md#anti-roadmap-não-vamos-fazer) pra entender o porquê.
+
 ## Contribuindo
 
 PRs bem-vindos. Antes de abrir:
