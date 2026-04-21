@@ -129,7 +129,7 @@ def report(
     """Alias for ``scan`` with default flags. Useful for quick re-renders."""
     scan(  # type: ignore[misc]
         paths=paths,
-        auto_discover=None,
+        auto_discover=[],
         output=output,
         no_global=False,
         max_depth=4,
