@@ -16,9 +16,9 @@ class ArtifactKind(str, Enum):
 
 
 class Scope(str, Enum):
-    GLOBAL = "global"  # ~/.claude/
-    PROJECT = "project"  # <repo>/.claude/
-    USER = "user"  # ~/.claude/ for skills user dir
+    GLOBAL = "global"
+    PROJECT = "project"
+    USER = "user"
     UNKNOWN = "unknown"
 
 
@@ -31,6 +31,15 @@ class EdgeKind(str, Enum):
     TRIGGER_COLLISION = "trigger_collision"
 
 
+class Severity(str, Enum):
+    """Severity of an issue edge. Non-issue edges use ``NONE``."""
+
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 @dataclass
 class Artifact:
     """A single Claude Code artifact discovered on disk."""
@@ -40,7 +49,7 @@ class Artifact:
     name: str
     path: Path
     scope: Scope
-    root: Path  # the .claude dir (or parent) this artifact belongs to
+    root: Path
     description: str = ""
     triggers: list[str] = field(default_factory=list)
     body: str = ""
@@ -65,6 +74,7 @@ class Edge:
     kind: EdgeKind
     weight: float = 1.0
     detail: str = ""
+    severity: Severity = Severity.NONE
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -73,6 +83,7 @@ class Edge:
             "kind": self.kind.value,
             "weight": self.weight,
             "detail": self.detail,
+            "severity": self.severity.value,
         }
 
 
@@ -103,14 +114,19 @@ class ScanResult:
         for a in self.artifacts:
             by_kind[a.kind.value] = by_kind.get(a.kind.value, 0) + 1
         by_edge: dict[str, int] = {}
+        by_severity: dict[str, int] = {}
         for e in self.edges:
             by_edge[e.kind.value] = by_edge.get(e.kind.value, 0) + 1
+            if e.severity != Severity.NONE:
+                by_severity[e.severity.value] = by_severity.get(e.severity.value, 0) + 1
         return {
             "artifacts_total": len(self.artifacts),
             "edges_total": len(self.edges),
+            "issues_total": len(self.issues),
             "roots_scanned": len(self.roots_scanned),
             **{f"artifacts_{k}": v for k, v in by_kind.items()},
             **{f"edges_{k}": v for k, v in by_edge.items()},
+            **{f"severity_{k}": v for k, v in by_severity.items()},
         }
 
     def to_dict(self) -> dict[str, Any]:
