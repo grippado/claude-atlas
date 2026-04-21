@@ -14,6 +14,47 @@ from claude_atlas.models import Artifact, ArtifactKind, Scope
 # Token pattern for Jaccard/trigger extraction: alphanumeric words of length >= 3.
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]{2,}")
 
+# Fallback regex for when python-frontmatter chokes on malformed YAML.
+# Many real-world agent/skill files use multi-line `description:` values without
+# proper YAML block scalar indicators (e.g., `description: text that wraps\nacross lines\n`),
+# which is technically invalid YAML and makes the parser raise.
+_FRONTMATTER_BLOCK_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)", re.DOTALL)
+_FM_NAME_RE = re.compile(r"^name:\s*(.+?)\s*$", re.MULTILINE)
+_FM_DESC_RE = re.compile(
+    r"^description:\s*(.+?)(?=^[a-zA-Z_][a-zA-Z0-9_-]*:\s|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _best_effort_frontmatter(raw: str) -> tuple[dict[str, Any], str]:
+    """
+    Best-effort extraction when python-frontmatter can't parse the YAML block.
+
+    Returns ``(metadata, body)``. If no frontmatter block is present at all,
+    returns ``({}, raw)`` unchanged.
+    """
+    block_match = _FRONTMATTER_BLOCK_RE.match(raw)
+    if not block_match:
+        return {}, raw
+
+    fm_block = block_match.group(1)
+    body = block_match.group(2)
+
+    meta: dict[str, Any] = {}
+
+    name_m = _FM_NAME_RE.search(fm_block)
+    if name_m:
+        meta["name"] = name_m.group(1).strip().strip("'\"")
+
+    desc_m = _FM_DESC_RE.search(fm_block)
+    if desc_m:
+        # Collapse whitespace in multi-line descriptions so the regex survives
+        # the multi-line YAML that broke the real parser in the first place.
+        desc = re.sub(r"\s+", " ", desc_m.group(1).strip()).strip("'\"")
+        meta["description"] = desc
+
+    return meta, body
+
 
 def _hash_body(body: str) -> str:
     return hashlib.sha256(body.strip().encode("utf-8")).hexdigest()
@@ -77,8 +118,10 @@ def parse_artifact_file(
         fm: dict[str, Any] = dict(post.metadata)
         body: str = post.content
     except Exception:
-        fm = {}
-        body = raw
+        # YAML parsing failed — commonly due to multi-line description values
+        # without proper block-scalar indicators. Fall back to regex extraction
+        # so we at least capture name + description + body correctly.
+        fm, body = _best_effort_frontmatter(raw)
 
     # Name resolution precedence: frontmatter `name` > filename stem > parent dir name.
     name = str(fm.get("name") or path.stem)

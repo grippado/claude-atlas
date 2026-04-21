@@ -60,7 +60,6 @@ def test_semantic_duplicate_detection() -> None:
         "refactor-2",
         body="refactor code review improve architecture quality clean patterns",
     )
-    # Too short → ignored by semantic detector.
     c = _make_artifact("tiny", body="only three words here")
 
     edges = detect_semantic_duplicates([a, b, c], threshold=0.6)
@@ -76,7 +75,6 @@ def test_overrides_detection() -> None:
     edges = detect_overrides([g, p])
     assert len(edges) == 1
     assert edges[0].kind == EdgeKind.OVERRIDES
-    # The project one is the source (it overrides the global one).
     assert edges[0].source == p.id
     assert edges[0].target == g.id
 
@@ -94,7 +92,6 @@ def test_trigger_collision_detection() -> None:
 def test_discovery_and_parsers() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        # Build a fake .claude tree.
         claude = tmp_path / "myrepo" / ".claude"
         (claude / "agents").mkdir(parents=True)
         (claude / "skills" / "my-skill").mkdir(parents=True)
@@ -133,13 +130,40 @@ def test_parse_artifact_file_handles_no_frontmatter() -> None:
         assert a.body_hash
 
 
+def test_parse_artifact_file_handles_malformed_multiline_description() -> None:
+    """
+    Real-world agents often have unquoted multi-line `description:` values that
+    aren't valid YAML. The parser must fall back to regex extraction so these
+    artifacts still get useful name + description + triggers.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        f = tmp_path / "studio-coach.md"
+        f.write_text(
+            "---\n"
+            "name: studio-coach\n"
+            "description: PROACTIVELY use this agent when\n"
+            "complex multi-agent tasks begin, when agents\n"
+            "seem stuck or overwhelmed, or when the team\n"
+            "needs motivation and coordination.\n"
+            "---\n"
+            "\n"
+            "You are the studio coach.\n"
+        )
+        a = parse_artifact_file(f, ArtifactKind.AGENT, tmp_path)
+        assert a is not None
+        assert a.name == "studio-coach"
+        assert "PROACTIVELY" in a.description
+        assert "coordination" in a.description
+        assert len(a.triggers) > 0
+
+
 def test_build_all_edges_integration() -> None:
     dup = "shared body text for duplicate detection test purposes here now"
     a = _make_artifact("x", kind=ArtifactKind.AGENT, body=dup, triggers=["foo", "bar"])
     b = _make_artifact("y", kind=ArtifactKind.AGENT, body=dup, triggers=["foo", "bar", "baz"])
     edges = build_all_edges([a, b])
     kinds = {e.kind for e in edges}
-    # Both exact-dup and trigger-collision should fire.
     assert EdgeKind.DUPLICATE_EXACT in kinds
     assert EdgeKind.TRIGGER_COLLISION in kinds
 

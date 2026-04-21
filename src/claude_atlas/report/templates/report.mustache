@@ -137,7 +137,10 @@
           'text-outline-color': '#0b1020',
           'text-outline-width': 2,
           'text-valign': 'bottom',
-          'text-margin-y': 4,
+          'text-halign': 'center',
+          'text-margin-y': 6,
+          'text-wrap': 'ellipsis',
+          'text-max-width': '120px',
           'width': 22,
           'height': 22,
           'border-width': 1,
@@ -151,6 +154,8 @@
           'border-width': 3,
           'width': 28,
           'height': 28,
+          'text-max-width': '240px',
+          'font-size': 12,
         }
       },
       {
@@ -160,7 +165,7 @@
           'width': 'mapData(weight, 0, 1.5, 1, 4)',
           'curve-style': 'bezier',
           'target-arrow-shape': 'none',
-          'opacity': 0.7,
+          'opacity': 0.6,
         }
       },
       {
@@ -168,17 +173,25 @@
         style: { 'target-arrow-shape': 'triangle', 'target-arrow-color': 'data(color)' }
       },
       {
+        selector: 'edge[?is_issue]',
+        style: { 'opacity': 0.9, 'width': 'mapData(weight, 0, 2, 2, 5)' }
+      },
+      {
         selector: '.dimmed',
-        style: { 'opacity': 0.1 }
+        style: { 'opacity': 0.08 }
       }
     ],
     layout: {
       name: 'cose',
       animate: false,
-      idealEdgeLength: 80,
-      nodeRepulsion: 8000,
-      nodeOverlap: 20,
-      padding: 40,
+      idealEdgeLength: 140,
+      nodeRepulsion: 20000,
+      nodeOverlap: 40,
+      gravity: 0.15,
+      componentSpacing: 200,
+      padding: 60,
+      randomize: true,
+      fit: true,
     },
   });
 
