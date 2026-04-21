@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Claude Atlas Report</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121829;
+    --panel-2: #1a2238;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --accent: #60a5fa;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --border: #24304a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.2px; }
+  header .pills { display: flex; gap: 8px; margin-left: auto; font-size: 12px; color: var(--muted); }
+  header .pill { background: var(--panel); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; }
+  main { display: grid; grid-template-columns: 1fr 360px; height: calc(100vh - 52px); }
+  #cy { width: 100%; height: 100%; background: radial-gradient(circle at 30% 20%, #101733 0%, #0b1020 70%); }
+  aside { background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-width: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tabs button { flex: 1; background: transparent; color: var(--muted); border: none; padding: 10px; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-body { padding: 14px; overflow: auto; flex: 1; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; font-size: 12px; margin-top: 8px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-word; }
+  pre { background: var(--panel-2); padding: 10px; border-radius: 6px; font-size: 11px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin: 1px 2px; background: var(--panel-2); color: var(--muted); }
+  .kind-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .filters { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+  .filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
+  .filters input { accent-color: var(--accent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px 14px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗺️ Claude Atlas</h1>
+  <span class="muted">{{artifacts_total}} artifacts · {{issues_total}} issues</span>
+  <div class="pills">
+    {{#roots_scanned}}<span class="pill">{{.}}</span>{{/roots_scanned}}
+  </div>
+</header>
+<div class="legend">
+  <span><span class="dot" style="background:#60a5fa"></span>agent</span>
+  <span><span class="dot" style="background:#34d399"></span>skill</span>
+  <span><span class="dot" style="background:#f59e0b"></span>command</span>
+  <span><span class="dot" style="background:#a78bfa"></span>memory</span>
+  <span style="margin-left:auto">
+    <span class="dot" style="background:#ef4444"></span>dup-exact
+    <span class="dot" style="background:#f97316"></span>dup-semantic
+    <span class="dot" style="background:#eab308"></span>trigger
+    <span class="dot" style="background:#ec4899"></span>override
+  </span>
+</div>
+<div class="filters">
+  <label><input type="checkbox" data-kind="agent" checked> agents</label>
+  <label><input type="checkbox" data-kind="skill" checked> skills</label>
+  <label><input type="checkbox" data-kind="command" checked> commands</label>
+  <label><input type="checkbox" data-kind="memory" checked> memory</label>
+  <label style="margin-left:auto"><input type="checkbox" id="issues-only"> issues only</label>
+</div>
+<main>
+  <div id="cy"></div>
+  <aside>
+    <div class="tabs">
+      <button class="active" data-tab="detail">Detail</button>
+      <button data-tab="issues">Issues ({{issues_total}})</button>
+      <button data-tab="stats">Stats</button>
+    </div>
+    <div class="tab-body" id="tab-detail">
+      <div class="empty">Click a node to inspect it.</div>
+    </div>
+    <div class="tab-body" id="tab-issues" style="display:none">
+      {{#has_issues}}
+      <table>
+        <thead><tr><th>Kind</th><th>Source</th><th>Target</th><th>Detail</th></tr></thead>
+        <tbody>
+        {{#issues}}
+          <tr>
+            <td><span class="kind-badge" style="background:#24304a">{{kind}}</span></td>
+            <td><div>{{source_name}}</div><div class="muted">{{source_path}}</div></td>
+            <td><div>{{target_name}}</div><div class="muted">{{target_path}}</div></td>
+            <td>{{detail}}</td>
+          </tr>
+        {{/issues}}
+        </tbody>
+      </table>
+      {{/has_issues}}
+      {{^has_issues}}
+      <div class="empty">No issues detected. 🎉</div>
+      {{/has_issues}}
+    </div>
+    <div class="tab-body" id="tab-stats" style="display:none">
+      <table>
+        <tbody>
+        {{#stats}}
+          <tr><td class="muted">{{key}}</td><td>{{value}}</td></tr>
+        {{/stats}}
+        </tbody>
+      </table>
+    </div>
+  </aside>
+</main>
+<script>
+  const GRAPH = {{{graph_json}}};
+
+  const cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: [
+      ...GRAPH.nodes,
+      ...GRAPH.edges,
+    ],
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': 'data(color)',
+          'label': 'data(label)',
+          'color': '#e5e7eb',
+          'font-size': 10,
+          'text-outline-color': '#0b1020',
+          'text-outline-width': 2,
+          'text-valign': 'bottom',
+          'text-margin-y': 4,
+          'width': 22,
+          'height': 22,
+          'border-width': 1,
+          'border-color': '#24304a',
+        }
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'border-color': '#fef08a',
+          'border-width': 3,
+          'width': 28,
+          'height': 28,
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'line-color': 'data(color)',
+          'width': 'mapData(weight, 0, 1.5, 1, 4)',
+          'curve-style': 'bezier',
+          'target-arrow-shape': 'none',
+          'opacity': 0.7,
+        }
+      },
+      {
+        selector: 'edge[kind = "overrides"]',
+        style: { 'target-arrow-shape': 'triangle', 'target-arrow-color': 'data(color)' }
+      },
+      {
+        selector: '.dimmed',
+        style: { 'opacity': 0.1 }
+      }
+    ],
+    layout: {
+      name: 'cose',
+      animate: false,
+      idealEdgeLength: 80,
+      nodeRepulsion: 8000,
+      nodeOverlap: 20,
+      padding: 40,
+    },
+  });
+
+  // --- Detail tab ---
+  const tabDetail = document.getElementById('tab-detail');
+  function renderDetail(data) {
+    const triggers = (data.triggers || []).map(t => `<span class="tag">${t}</span>`).join('') || '<span class="muted">(none)</span>';
+    tabDetail.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="kind-badge" style="background:${data.color}20; color:${data.color}">${data.kind}</span>
+        <strong>${escapeHtml(data.label)}</strong>
+      </div>
+      <dl class="kv">
+        <dt>scope</dt><dd>${data.scope}</dd>
+        <dt>path</dt><dd>${escapeHtml(data.path)}</dd>
+        <dt>triggers</dt><dd>${triggers}</dd>
+      </dl>
+      <div class="muted" style="margin-top:10px">description</div>
+      <div>${escapeHtml(data.description || '(none)')}</div>
+      <div class="muted" style="margin-top:10px">body preview</div>
+      <pre>${escapeHtml(data.body_preview || '')}</pre>
+    `;
+  }
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  cy.on('tap', 'node', evt => renderDetail(evt.target.data()));
+  cy.on('tap', (evt) => {
+    if (evt.target === cy) {
+      tabDetail.innerHTML = '<div class="empty">Click a node to inspect it.</div>';
+    }
+  });
+
+  // --- Tabs ---
+  document.querySelectorAll('.tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      ['detail','issues','stats'].forEach(t => {
+        document.getElementById('tab-' + t).style.display = (t === btn.dataset.tab) ? 'block' : 'none';
+      });
+    });
+  });
+
+  // --- Filters ---
+  function applyFilters() {
+    const active = new Set(
+      Array.from(document.querySelectorAll('.filters input[data-kind]:checked'))
+        .map(el => el.dataset.kind)
+    );
+    const issuesOnly = document.getElementById('issues-only').checked;
+
+    cy.batch(() => {
+      cy.nodes().forEach(n => {
+        n.removeClass('dimmed');
+        if (!active.has(n.data('kind'))) n.addClass('dimmed');
+      });
+      cy.edges().forEach(e => {
+        e.removeClass('dimmed');
+        if (issuesOnly && !e.data('is_issue')) e.addClass('dimmed');
+        const s = e.source(), t = e.target();
+        if (s.hasClass('dimmed') || t.hasClass('dimmed')) e.addClass('dimmed');
+      });
+    });
+  }
+  document.querySelectorAll('.filters input').forEach(el => el.addEventListener('change', applyFilters));
+</script>
+</body>
+</html>
