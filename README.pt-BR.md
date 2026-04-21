@@ -74,6 +74,26 @@ claude-atlas version     imprime a versão
 
 Qualquer comando aceita `--help`.
 
+## Uso em CI / pre-commit
+
+Use `claude-atlas check` para checks lint-style em scripts e CI:
+
+```bash
+# Default: falha se houver qualquer issue HIGH
+claude-atlas check
+
+# Pre-commit hook: só falha em duplicatas e overrides
+claude-atlas check --max-severity high --quiet
+
+# CI com annotations do GitHub Actions
+claude-atlas check --format github
+
+# Tudo como JSON pra ferramentas customizadas
+claude-atlas check --top 0 --format json
+```
+
+Exit codes: `0` (limpo), `1` (issues encontradas no threshold), `2` (erro).
+
 ## Contribuindo
 
 PRs bem-vindos. Antes de abrir:

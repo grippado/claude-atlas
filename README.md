@@ -74,6 +74,26 @@ claude-atlas version     print version
 
 Run any command with `--help` for full flags.
 
+## CI / pre-commit usage
+
+Use `claude-atlas check` for lint-style health checks in scripts and CI:
+
+```bash
+# Default: fail on any HIGH-severity issue
+claude-atlas check
+
+# Pre-commit hook: only fail on duplicates and overrides
+claude-atlas check --max-severity high --quiet
+
+# CI with GitHub Actions annotations
+claude-atlas check --format github
+
+# Get everything as JSON for custom tooling
+claude-atlas check --top 0 --format json
+```
+
+Exit codes: `0` (clean), `1` (issues found at threshold), `2` (error).
+
 ## Project layout
 
 ```
