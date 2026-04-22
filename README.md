@@ -1,21 +1,36 @@
 # 🗺️ Claude Atlas
 
-> Scan, map, and visualize your Claude Code setup: agents, skills, slash commands, and `CLAUDE.md` memory files — all in one interactive graph.
+> Audit your Claude Code setup. Find duplicate agents, conflicting triggers, and orphaned memory files before they silently break your workflow.
 
 **Languages:** [English](README.md) · [Português 🇧🇷](README.pt-BR.md)
 
+<p align="center">
+  <img src="./docs/screenshots/atlas-logo.png" width="200" alt="Claude Atlas logo" />
+</p>
+
 ---
 
-## Why
+If you've been building out `~/.claude/` for a while, you probably have:
 
-As you accumulate agents, skills, slash commands, and `CLAUDE.md` files across global (`~/.claude/`) and project scopes, it becomes surprisingly hard to answer:
+- Two agents that do nearly the same thing, competing for the same triggers.
+- A `CLAUDE.md` you wrote for a project you abandoned months ago.
+- A global skill quietly shadowed by a project-scoped version in one of your repos.
+- No clear picture of how many artifacts you've accumulated total.
 
-- Which skills are near-duplicates of each other?
-- Which project-scoped agent silently overrides a global one?
-- Which artifacts share the same triggers and will compete for activation?
-- Which `CLAUDE.md` is actually in effect for this repo?
+**Claude Atlas scans your setup and surfaces these in seconds.** Run it in your terminal for a quick health check, or generate an interactive HTML report for deeper triage.
 
-**claude-atlas** scans your machine, builds a relationship graph, and renders a standalone HTML report so you can see all of it at once.
+```bash
+# Install
+uv tool install claude-atlas
+
+# 5-second health check
+claude-atlas check
+
+# Full interactive report
+claude-atlas scan
+```
+
+Offline by default. MIT licensed. Docs in EN + PT-BR.
 
 ## Install
 

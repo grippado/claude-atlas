@@ -1,21 +1,36 @@
 # 🗺️ Claude Atlas
 
-> Escaneia, mapeia e visualiza sua configuração do Claude Code: agents, skills, slash commands e arquivos `CLAUDE.md` — tudo num grafo interativo.
+> Audite seu setup do Claude Code. Encontre agents duplicados, gatilhos em conflito e arquivos de memória órfãos antes que silenciosamente atrapalhem seu workflow.
 
 **Idiomas:** [English](README.md) · [Português 🇧🇷](README.pt-BR.md)
 
+<p align="center">
+  <img src="./docs/screenshots/atlas-logo.png" width="200" alt="Claude Atlas logo" />
+</p>
+
 ---
 
-## Por quê
+Se você vem acumulando coisas no `~/.claude/` há um tempo, provavelmente tem:
 
-Conforme você acumula agents, skills, slash commands e `CLAUDE.md` entre escopo global (`~/.claude/`) e projetos, fica surpreendentemente difícil responder:
+- Dois agents que fazem quase a mesma coisa, brigando pelos mesmos gatilhos.
+- Um `CLAUDE.md` que você escreveu pra um projeto abandonado há meses.
+- Uma skill global silenciosamente sombreada por uma versão com escopo de projeto em um dos seus repos.
+- Nenhuma visão clara de quantos artefatos você acumulou no total.
 
-- Quais skills são quase-duplicatas umas das outras?
-- Qual agent de projeto está silenciosamente sobrescrevendo um global?
-- Quais artefatos compartilham os mesmos triggers e vão competir pela ativação?
-- Qual `CLAUDE.md` está de fato em vigor pra este repo?
+**O Claude Atlas escaneia seu setup e expõe isso em segundos.** Roda no terminal pra um health check rápido, ou gera um relatório HTML interativo pra triagem profunda.
 
-**claude-atlas** escaneia sua máquina, monta o grafo de relacionamentos e gera um relatório HTML standalone pra você ver tudo de uma vez.
+```bash
+# Instalar
+uv tool install claude-atlas
+
+# Check de saúde em 5 segundos
+claude-atlas check
+
+# Relatório interativo completo
+claude-atlas scan
+```
+
+Offline por padrão. Licença MIT. Docs em EN + PT-BR.
 
 ## Instalação
 
