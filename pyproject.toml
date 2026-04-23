@@ -1,6 +1,6 @@
 [project]
 name = "claude-atlas"
-version = "0.3.0"
+version = "0.3.1"
 description = "Scan, map, and visualize your Claude Code setup: agents, skills, slash commands, and memory files."
 readme = "README.md"
 requires-python = ">=3.11"
