@@ -51,3 +51,6 @@ claude-atlas.html
 atlas-*.html
 /tmp/
 comms/
+
+# Local launch communication drafts (not for public repo)
+comms/
