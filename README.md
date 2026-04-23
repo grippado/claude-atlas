@@ -5,7 +5,7 @@
 **Languages:** [English](README.md) · [Português 🇧🇷](README.pt-BR.md)
 
 <p align="center">
-  <img src="./docs/screenshots/atlas-logo.png" width="200" alt="Claude Atlas logo" />
+  <img src="./docs/screenshots/atlas.png" width="300" alt="Claude Atlas logo" />
 </p>
 
 ---
