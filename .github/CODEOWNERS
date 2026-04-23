@@ -1,0 +1,5 @@
+# Code owners for claude-atlas.
+# Every PR touching any file will request review from @grippado by default.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+*       @grippado
