@@ -60,6 +60,18 @@ packages = ["src/claude_atlas"]
 [tool.hatch.build.targets.wheel.force-include]
 "src/claude_atlas/report/templates/report.mustache" = "claude_atlas/report/templates/report.mustache"
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/claude_atlas",
+    "tests",
+    "README.md",
+    "README.pt-BR.md",
+    "ROADMAP.md",
+    "ROADMAP.pt-BR.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

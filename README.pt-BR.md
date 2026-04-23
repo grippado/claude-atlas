@@ -5,7 +5,7 @@
 **Idiomas:** [English](README.md) · [Português 🇧🇷](README.pt-BR.md)
 
 <p align="center">
-  <img src="./docs/screenshots/atlas.png" width="300" alt="Claude Atlas logo" />
+  <img src="https://raw.githubusercontent.com/grippado/claude-atlas/main/docs/screenshots/atlas.png" width="300" alt="Claude Atlas logo" />
 </p>
 
 ---
@@ -34,13 +34,41 @@ Offline por padrão. Licença MIT. Docs em EN + PT-BR.
 
 ## Instalação
 
+**Pré-requisitos:** Python 3.11+ e [`uv`](https://docs.astral.sh/uv/) (ou `pipx` / `pip`).
+
+Se ainda não tem o `uv`:
+
 ```bash
-uv tool install claude-atlas
-# ou a partir do código:
-uv pip install -e .
+# macOS (Homebrew)
+brew install uv
+
+# macOS / Linux (instalador oficial)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Requer Python 3.11+.
+Depois instale o claude-atlas:
+
+```bash
+# Recomendado: instalação isolada como ferramenta (a partir do PyPI)
+uv tool install claude-atlas
+
+# Ou com pipx
+pipx install claude-atlas
+
+# Ou pip puro
+pip install claude-atlas
+```
+
+Para atualizar: `uv tool upgrade claude-atlas`.
+
+### A partir do código-fonte
+
+```bash
+git clone https://github.com/grippado/claude-atlas.git
+cd claude-atlas
+uv sync --all-extras
+uv run claude-atlas --help
+```
 
 ## Começo rápido
 
@@ -77,7 +105,11 @@ Thresholds ficam em `src/claude_atlas/analysis/graph.py` caso queira ajustar.
 
 Com `--semantic`, pares flagados pelo Jaccard vão pra API da Anthropic pra um veredito estruturado (`duplicate` / `overlap` / `distinct`). Pares que o modelo considera "distinct" são removidos do grafo; os outros recebem a justificativa do modelo no detalhe da aresta.
 
-Requer `ANTHROPIC_API_KEY` e `uv pip install "claude-atlas[semantic]"` (adiciona o SDK `anthropic`).
+Requer `ANTHROPIC_API_KEY`. Reinstale com o extra `semantic` para trazer o SDK `anthropic`:
+
+```bash
+uv tool install "claude-atlas[semantic]"
+```
 
 ## Comandos
 
