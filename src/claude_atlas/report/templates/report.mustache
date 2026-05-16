@@ -93,6 +93,19 @@
   @media (max-width: 720px) {
     .issue-card .card-preview { grid-template-columns: 1fr; }
   }
+  .issue-card .card-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .issue-card .card-actions button { background: var(--panel-3); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-family: inherit; transition: background 0.1s, border-color 0.1s; }
+  .issue-card .card-actions button:hover { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
+  .issue-card .card-actions button.copied { background: rgba(52,211,153,0.15); border-color: #34d399; color: #6ee7b7; }
+  .issue-card .card-actions button.danger:hover { border-color: var(--danger); color: #fca5a5; }
+  .issue-card.skipped { opacity: 0.55; }
+  .issue-card.skipped .skip-btn::before { content: "✓ "; }
+
+  .skip-control { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-left: 10px; }
+  .skip-control button { background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 3px 9px; font-size: 11px; cursor: pointer; color: var(--muted); font-family: inherit; }
+  .skip-control button:hover { color: var(--text); border-color: var(--accent); }
+  .skip-control.empty { display: none; }
+  body:not(.show-skipped) .issue-card.skipped { display: none !important; }
 
   .empty { color: var(--muted); text-align: center; padding: 60px 10px; font-size: 14px; }
   .empty .big { font-size: 32px; display: block; margin-bottom: 8px; }
@@ -201,6 +214,10 @@
     <div class="triage-header">
       <h2>Triage</h2>
       <span class="meta">{{issues_total}} issue{{^issue_singular}}s{{/issue_singular}} across {{artifacts_total}} artifacts</span>
+      <span class="skip-control empty" id="skip-control">
+        <span id="skip-count"></span>
+        <button id="show-skipped-btn" type="button">Show</button>
+      </span>
     </div>
 
     {{#has_issues}}
@@ -255,6 +272,12 @@
                       <div class="body-excerpt has-fade">{{target_body_excerpt}}</div>
                     {{/target_has_body}}
                   </div>
+                </div>
+                <div class="card-actions">
+                  <button class="open-btn" data-target-path="{{source_path}}">Open source</button>
+                  <button class="open-btn" data-target-path="{{target_path}}">Open target</button>
+                  <button class="copy-fix-btn">Copy fix prompt</button>
+                  <button class="skip-btn danger">Skip</button>
                 </div>
               </article>
             {{/issues}}
@@ -496,9 +519,124 @@
     cy.elements().removeClass('highlighted dimmed');
   }
 
-  // --- Triage interactions ---
+  // --- Skip persistence (localStorage) ---
+  const SKIP_KEY = 'claude-atlas:skipped';
+  function loadSkipped() {
+    try {
+      const raw = localStorage.getItem(SKIP_KEY);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch (e) { return new Set(); }
+  }
+  function saveSkipped(set) {
+    try { localStorage.setItem(SKIP_KEY, JSON.stringify([...set])); }
+    catch (e) { /* quota or disabled — ignore */ }
+  }
+  const skippedSet = loadSkipped();
+
+  function refreshSkipUI() {
+    document.querySelectorAll('#view-triage .issue-card').forEach(card => {
+      const isSkipped = skippedSet.has(card.dataset.edgeId);
+      card.classList.toggle('skipped', isSkipped);
+      const btn = card.querySelector('.skip-btn');
+      if (btn) btn.textContent = isSkipped ? 'Unskip' : 'Skip';
+    });
+    const ctl = document.getElementById('skip-control');
+    const count = skippedSet.size;
+    if (count === 0) {
+      ctl.classList.add('empty');
+    } else {
+      ctl.classList.remove('empty');
+      document.getElementById('skip-count').textContent = `${count} skipped`;
+      const btn = document.getElementById('show-skipped-btn');
+      btn.textContent = document.body.classList.contains('show-skipped') ? 'Hide' : 'Show';
+    }
+  }
+
+  document.getElementById('show-skipped-btn').addEventListener('click', () => {
+    document.body.classList.toggle('show-skipped');
+    refreshSkipUI();
+  });
+
+  // --- Per-issue actions ---
+  function buildSingleFixPrompt(card) {
+    const get = (sel) => (card.querySelector(sel)?.textContent || '').trim();
+    const kind = get('.kind-badge');
+    const sev = get('.sev-badge');
+    const srcName = card.querySelectorAll('.card-header strong')[0]?.textContent.trim() || '';
+    const tgtName = card.querySelectorAll('.card-header strong')[1]?.textContent.trim() || '';
+    const srcPath = card.querySelector('.open-btn[data-target-path]')?.dataset.targetPath || '';
+    const tgtPath = card.querySelectorAll('.open-btn[data-target-path]')[1]?.dataset.targetPath || '';
+    const detail = get('.card-detail');
+    const fix = (card.querySelector('.card-fix')?.textContent || '').replace(/^💡\s*/, '').trim();
+    let prompt = `# Claude Atlas — 1 issue to triage\n\n`;
+    prompt += `claude-atlas detected the issue below in my Claude Code setup. Please:\n\n`;
+    prompt += `1. Open both files and confirm whether the issue is real (not a false positive).\n`;
+    prompt += `2. Propose a fix following the suggestion under the issue.\n`;
+    prompt += `3. **Ask me to confirm before deleting or editing any file.** claude-atlas never modifies artifacts on its own and neither should you.\n\n`;
+    prompt += `## ${kind} (${sev})\n\n`;
+    prompt += `- **Source:** \`${srcPath}\` (\`${srcName}\`)\n`;
+    prompt += `- **Target:** \`${tgtPath}\` (\`${tgtName}\`)\n`;
+    prompt += `- **Detail:** ${detail}\n`;
+    if (fix) prompt += `- **Suggested fix:** ${fix}\n`;
+    return prompt;
+  }
+
+  function flashCopied(btn) {
+    const original = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 1500);
+  }
+
   document.querySelectorAll('#view-triage .issue-card').forEach(card => {
-    card.addEventListener('click', () => {
+    card.querySelectorAll('.open-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const path = btn.dataset.targetPath;
+        if (path) window.location.href = `vscode://file${path}`;
+      });
+    });
+    const copyBtn = card.querySelector('.copy-fix-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const prompt = buildSingleFixPrompt(card);
+        try {
+          await navigator.clipboard.writeText(prompt);
+          flashCopied(copyBtn);
+        } catch (err) {
+          // Fallback: select+copy via a temp textarea
+          const ta = document.createElement('textarea');
+          ta.value = prompt;
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); flashCopied(copyBtn); } catch (e2) {}
+          ta.remove();
+        }
+      });
+    }
+    const skipBtn = card.querySelector('.skip-btn');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = card.dataset.edgeId;
+        if (skippedSet.has(id)) skippedSet.delete(id);
+        else skippedSet.add(id);
+        saveSkipped(skippedSet);
+        refreshSkipUI();
+      });
+    }
+  });
+
+  refreshSkipUI();
+
+  // --- Triage card click (anywhere outside action buttons) ---
+  document.querySelectorAll('#view-triage .issue-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.card-actions') || e.target.closest('a, button')) return;
       // Switch to graph and highlight the pair
       setView('graph');
       if (cy) {
