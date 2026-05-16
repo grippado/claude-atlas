@@ -247,3 +247,50 @@ def test_run_check_top_zero_shows_all() -> None:
     assert "/tmp/a.md" in text
     assert "/tmp/c.md" in text
     assert "/tmp/e.md" in text
+
+
+def test_health_score_pristine_setup_is_100() -> None:
+    a = _mk_artifact("a")
+    result = ScanResult(artifacts=[a], edges=[], roots_scanned=[Path("/tmp")])
+    assert result.health_score() == 100
+    assert result.health_grade() == "A"
+
+
+def test_health_score_weights_by_severity() -> None:
+    result = _mk_result_with_issues()
+    # 1 high (10) + 1 medium (3) + 1 low (1) = 14 penalty → 86
+    assert result.health_score() == 86
+    assert result.health_grade() == "B"
+
+
+def test_health_score_clamped_at_zero() -> None:
+    artifacts = [_mk_artifact(f"a{i}") for i in range(30)]
+    edges = [
+        Edge(
+            source=artifacts[i].id,
+            target=artifacts[i + 1].id,
+            kind=EdgeKind.DUPLICATE_EXACT,
+            severity=Severity.HIGH,
+            detail="x",
+        )
+        for i in range(15)
+    ]
+    result = ScanResult(artifacts=artifacts, edges=edges, roots_scanned=[Path("/tmp")])
+    assert result.health_score() == 0
+    assert result.health_grade() == "F"
+
+
+def test_run_check_json_includes_health_score() -> None:
+    result = _mk_result_with_issues()
+    out = io.StringIO()
+    run_check(result, output_format="json", stream=out)
+    parsed = json.loads(out.getvalue())
+    assert parsed["summary"]["health_score"] == 86
+    assert parsed["summary"]["health_grade"] == "B"
+
+
+def test_run_check_text_mentions_health() -> None:
+    result = _mk_result_with_issues()
+    out = io.StringIO()
+    run_check(result, output_format="text", stream=out)
+    assert "Health: 86/100 (B)" in out.getvalue()

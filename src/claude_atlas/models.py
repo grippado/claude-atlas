@@ -109,6 +109,30 @@ class ScanResult:
             )
         ]
 
+    def health_score(self) -> int:
+        """
+        Single 0-100 score from issue counts weighted by severity.
+
+        Weights: high=10, medium=3, low=1. Clamped to [0, 100]. A pristine
+        setup scores 100; the score degrades as issues pile up.
+        """
+        weights = {Severity.HIGH: 10, Severity.MEDIUM: 3, Severity.LOW: 1}
+        penalty = sum(weights.get(e.severity, 0) for e in self.issues)
+        return max(0, 100 - penalty)
+
+    def health_grade(self) -> str:
+        """Letter grade derived from health_score, for quick at-a-glance reads."""
+        score = self.health_score()
+        if score >= 90:
+            return "A"
+        if score >= 75:
+            return "B"
+        if score >= 50:
+            return "C"
+        if score >= 25:
+            return "D"
+        return "F"
+
     def stats(self) -> dict[str, int]:
         by_kind: dict[str, int] = {}
         for a in self.artifacts:
@@ -135,4 +159,6 @@ class ScanResult:
             "edges": [e.to_dict() for e in self.edges],
             "roots_scanned": [str(p) for p in self.roots_scanned],
             "stats": self.stats(),
+            "health_score": self.health_score(),
+            "health_grade": self.health_grade(),
         }
