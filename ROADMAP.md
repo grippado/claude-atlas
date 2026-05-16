@@ -23,73 +23,7 @@ These guide every release. They're also the easiest way to know if a feature req
 | v0.2.0  | Signal + UX overhaul                 | Severity classification, domain stopwords, grouped issues, search, orphan panel. |
 | v0.3.0  | `check` command for CI               | Lint-style output, exit codes, text/json/github formats.                         |
 | v0.4.0  | Backend foundation                   | Health score, `check --since` diff, `fix` command, pre-commit hook templates.    |
-
-## Next: v0.5.0 — HTML triage dashboard
-
-**Status:** Planned. The v0.4.0 backend work (health score, diff, fix prompts) gave us the data layer; v0.5.0 puts it behind a UI that prioritizes action over exploration.
-
-### Why
-
-The current HTML report uses an Obsidian-style graph view as its centerpiece. After dogfooding, we've observed a fundamental mismatch:
-
-> Graph views are good for *discovering* unknown structure. They're mediocre for *deciding* what to do.
-
-When you open the report, you usually want to **act** — triage issues, decide what to merge, what to delete, what to rename. The graph forces you to interpret topology before reaching action. The actual work happens in the sidebar's Issues tab.
-
-v0.5.0 inverts the priority: **the dashboard becomes the primary view; the graph becomes a secondary tab for when you genuinely want to explore structure**.
-
-### What changes
-
-- **Triage view as the default.** ([#9](https://github.com/grippado/claude-atlas/issues/9)) Issues rendered as full cards in the main area, not a cramped sidebar list.
-- **Side-by-side preview.** ([#10](https://github.com/grippado/claude-atlas/issues/10)) Each issue card shows both artifacts' frontmatter and body excerpt next to each other, so you can compare without opening files.
-- **Per-issue actions.** ([#11](https://github.com/grippado/claude-atlas/issues/11)) Each card has `[skip]`, `[open in editor]`, and `[copy fix prompt]` buttons. Skip persists locally so you can dismiss known false-positives.
-- **Concentration overview.** ([#12](https://github.com/grippado/claude-atlas/issues/12)) A small treemap by scope → kind, sized by issue density. Replaces the graph as the at-a-glance "where are the problems concentrated?" answer.
-- **Graph as secondary tab.** ([#13](https://github.com/grippado/claude-atlas/issues/13)) Still available, still useful for exploring relationships. Just not the front door.
-
-The health-score pill ([#8](https://github.com/grippado/claude-atlas/issues/8), shipped in v0.4.0) is already in the header.
-
-### Wireframe
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ 🗺️  Claude Atlas        Health: 78/100  ●  72 artifacts · 17 issues  [search]│
-├──────────────────────────────────────────────────────────────────────────────┤
-│ severity: ☑ high  ☑ medium  ☐ low      view: ◉ Triage  ○ Graph  ○ Stats     │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─ HIGH ─────────────────────────────────────────────────────────────────┐ │
-│  │  🔴  studio-coach.md  ↔  coach-old.md            [skip] [open] [fix]   │ │
-│  │      duplicate_exact · identical SHA-256                                │ │
-│  │      ┌─ studio-coach.md ──────┐  ┌─ coach-old.md ─────────┐            │ │
-│  │      │ name: studio-coach     │  │ name: studio-coach     │            │ │
-│  │      │ description: PROACT... │  │ description: PROACT... │            │ │
-│  │      │ ...                    │  │ ...                    │            │ │
-│  │      └────────────────────────┘  └────────────────────────┘            │ │
-│  │      💡 Delete one — keep the one in the narrower scope.               │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  ┌─ MEDIUM ───────────────────────────────────────────────────────────────┐ │
-│  │  🟠  refactor-helper.md  ↔  code-cleaner.md      [skip] [open] [fix]   │ │
-│  │      trigger_collision · 4 shared distinctive triggers                 │ │
-│  │      shared: refactor, cleanup, quality, architecture                  │ │
-│  │      💡 Rename triggers in code-cleaner to disambiguate.               │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  ┌─ Concentration overview ───────────────────────────────────────────────┐ │
-│  │  ┌──────────────┬──────────────┬─────────┐                             │ │
-│  │  │              │              │         │   block size = artifact     │ │
-│  │  │   agents/    │   skills/    │ commands│   color = max severity      │ │
-│  │  │              │              │         │                             │ │
-│  │  └──────────────┴──────────────┴─────────┘                             │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Out of scope (deliberately)
-
-- Automatic application of fixes. The tool will never edit or delete your artifacts on its own. The `[fix]` button copies a prompt for you to paste into Claude Code — no automation.
-- Server-side rendering, login, or sync. The output stays a single offline HTML file.
-- Persistence beyond `localStorage`. "Skip" decisions stay in your browser. No `~/.claude-atlas/` state directory unless we revisit this in a later version.
+| v0.5.0  | HTML triage dashboard                | Triage view as default, side-by-side previews, per-issue actions, treemap, lazy graph. |
 
 ## Considering for v0.6.0+
 
