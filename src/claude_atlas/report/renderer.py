@@ -117,6 +117,64 @@ def _to_cytoscape(result: ScanResult) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
+_FRONTMATTER_PRIORITY_KEYS = ("name", "description", "kind", "scope", "triggers")
+_FRONTMATTER_MAX_VALUE_LEN = 120
+_FRONTMATTER_MAX_FIELDS = 6
+_BODY_EXCERPT_LEN = 220
+
+
+def _truncate(text: str, limit: int) -> str:
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _frontmatter_preview(frontmatter: dict | None) -> list[dict]:
+    """Render a small list of frontmatter rows for side-by-side display."""
+    if not frontmatter:
+        return []
+    fm = dict(frontmatter)
+    # Stable ordering: priority keys first, then the rest alphabetically.
+    ordered_keys: list[str] = []
+    for k in _FRONTMATTER_PRIORITY_KEYS:
+        if k in fm:
+            ordered_keys.append(k)
+    for k in sorted(fm.keys()):
+        if k not in ordered_keys:
+            ordered_keys.append(k)
+    rows: list[dict] = []
+    for key in ordered_keys[:_FRONTMATTER_MAX_FIELDS]:
+        value = fm[key]
+        if isinstance(value, list):
+            text = ", ".join(str(x) for x in value)
+        elif isinstance(value, dict):
+            text = ", ".join(f"{k}={v}" for k, v in value.items())
+        else:
+            text = str(value)
+        rows.append({"key": key, "value": _truncate(text, _FRONTMATTER_MAX_VALUE_LEN)})
+    if len(ordered_keys) > _FRONTMATTER_MAX_FIELDS:
+        rows.append({
+            "key": "…",
+            "value": f"({len(ordered_keys) - _FRONTMATTER_MAX_FIELDS} more)",
+        })
+    return rows
+
+
+def _artifact_preview(artifact: object | None) -> dict:
+    """Return frontmatter rows + a short body excerpt for an artifact."""
+    if artifact is None:
+        return {"frontmatter": [], "body_excerpt": "", "has_frontmatter": False}
+    fm_rows = _frontmatter_preview(getattr(artifact, "frontmatter", None))
+    body = _truncate(getattr(artifact, "body", "") or "", _BODY_EXCERPT_LEN)
+    return {
+        "frontmatter": fm_rows,
+        "body_excerpt": body,
+        "has_frontmatter": bool(fm_rows),
+        "has_body": bool(body),
+    }
+
+
 def _group_issues(result: ScanResult) -> list[dict]:
     by_id = {a.id: a for a in result.artifacts}
     issues = sorted(
@@ -132,6 +190,8 @@ def _group_issues(result: ScanResult) -> list[dict]:
         tgt = by_id.get(e.target)
         src_name = src.name if src else e.source
         tgt_name = tgt.name if tgt else e.target
+        src_preview = _artifact_preview(src)
+        tgt_preview = _artifact_preview(tgt)
         row = {
             "edge_id": f"{e.source}::{e.target}::{e.kind.value}",
             "kind": kind,
@@ -139,9 +199,17 @@ def _group_issues(result: ScanResult) -> list[dict]:
             "source_id": e.source,
             "source_name": src_name,
             "source_path": str(src.path) if src else "",
+            "source_frontmatter": src_preview["frontmatter"],
+            "source_body_excerpt": src_preview["body_excerpt"],
+            "source_has_frontmatter": src_preview["has_frontmatter"],
+            "source_has_body": src_preview["has_body"],
             "target_id": e.target,
             "target_name": tgt_name,
             "target_path": str(tgt.path) if tgt else "",
+            "target_frontmatter": tgt_preview["frontmatter"],
+            "target_body_excerpt": tgt_preview["body_excerpt"],
+            "target_has_frontmatter": tgt_preview["has_frontmatter"],
+            "target_has_body": tgt_preview["has_body"],
             "detail": e.detail,
             "weight": f"{e.weight:.2f}",
             "fix": _suggested_fix(kind, src_name, tgt_name),
