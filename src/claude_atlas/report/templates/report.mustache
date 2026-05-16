@@ -4,7 +4,6 @@
 <meta charset="utf-8" />
 <title>Claude Atlas Report</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.0/dist/cytoscape.min.js"></script>
 <style>
   :root {
     --bg: #0b1020;
@@ -19,6 +18,9 @@
     --warn: #f59e0b;
     --caution: #eab308;
     --border: #24304a;
+    --sev-high: #ef4444;
+    --sev-medium: #f97316;
+    --sev-low: #eab308;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
@@ -31,9 +33,14 @@
   header .health .dot { width: 8px; height: 8px; border-radius: 50%; }
   header .pills { display: flex; gap: 6px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
   header .pill { background: var(--panel); border: 1px solid var(--border); padding: 3px 9px; border-radius: 999px; }
-  header .search { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: 0 1 360px; }
+  header .search { display: flex; align-items: center; gap: 8px; flex: 0 1 280px; }
   header .search input { width: 100%; background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; outline: none; }
   header .search input:focus { border-color: var(--accent); }
+
+  .view-switcher { margin-left: auto; display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 1px; }
+  .view-switcher button { background: transparent; color: var(--muted); border: none; padding: 5px 12px; cursor: pointer; font-size: 12px; font-family: inherit; border-radius: 6px; transition: background 0.1s, color 0.1s; }
+  .view-switcher button:hover { color: var(--text); }
+  .view-switcher button.active { background: var(--panel-3); color: var(--text); }
 
   .legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 7px 20px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
   .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
@@ -42,12 +49,44 @@
   .filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
   .filters input { accent-color: var(--accent); }
   .filters .divider { width: 1px; height: 16px; background: var(--border); }
+  .filters .graph-only { display: none; }
+  body.view-graph .filters .graph-only { display: inline-flex; }
 
-  main { display: grid; grid-template-columns: 1fr 400px; height: calc(100vh - 115px); }
-  main.sidebar-wide { grid-template-columns: 1fr 460px; }
+  /* Views */
+  .view { display: none; height: calc(100vh - 115px); }
+  .view.active { display: block; }
+  body.view-graph .view-graph { display: grid; grid-template-columns: 1fr 400px; }
+  body.view-graph .view-graph.sidebar-wide { grid-template-columns: 1fr 460px; }
 
+  /* Triage view */
+  .triage-container { padding: 18px 24px 40px; max-width: 1280px; margin: 0 auto; overflow-y: auto; height: 100%; }
+  .triage-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .triage-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .triage-header .meta { color: var(--muted); font-size: 12px; }
+
+  .sev-section { margin-bottom: 22px; }
+  .sev-heading { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .sev-heading .swatch { width: 10px; height: 10px; border-radius: 2px; }
+  .sev-heading .count { color: var(--text); font-weight: 600; }
+
+  .issue-card { background: var(--panel); border: 1px solid var(--border); border-left-width: 3px; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; transition: border-color 0.1s, background 0.1s; }
+  .issue-card:hover { background: var(--panel-2); }
+  .issue-card.sev-border-high { border-left-color: var(--sev-high); }
+  .issue-card.sev-border-medium { border-left-color: var(--sev-medium); }
+  .issue-card.sev-border-low { border-left-color: var(--sev-low); }
+  .issue-card .card-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .issue-card .card-header strong { color: var(--text); font-size: 13px; }
+  .issue-card .card-header .arrow { color: var(--muted-2); }
+  .issue-card .card-paths { font-size: 11px; color: var(--muted); margin-bottom: 6px; word-break: break-all; line-height: 1.4; }
+  .issue-card .card-paths code { background: var(--panel-2); padding: 1px 5px; border-radius: 3px; font-size: 10px; }
+  .issue-card .card-detail { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .issue-card .card-fix { font-size: 12px; color: var(--accent); margin-top: 6px; line-height: 1.4; }
+
+  .empty { color: var(--muted); text-align: center; padding: 60px 10px; font-size: 14px; }
+  .empty .big { font-size: 32px; display: block; margin-bottom: 8px; }
+
+  /* Graph view (existing) */
   #cy { width: 100%; height: 100%; background: radial-gradient(circle at 30% 20%, #101733 0%, #0b1020 70%); }
-
   aside { background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
   .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel); }
   .tabs button { flex: 1; background: transparent; color: var(--muted); border: none; padding: 10px 6px; cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent; font-family: inherit; }
@@ -67,28 +106,6 @@
   .sev-high { background: rgba(239,68,68,0.15); color: #fca5a5; }
   .sev-medium { background: rgba(249,115,22,0.15); color: #fdba74; }
   .sev-low { background: rgba(234,179,8,0.15); color: #fde047; }
-  .empty { color: var(--muted); text-align: center; padding: 40px 10px; font-size: 13px; }
-
-  details.sev-group { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-  details.sev-group > summary { cursor: pointer; list-style: none; padding: 8px 12px; background: var(--panel-2); display: flex; align-items: center; gap: 8px; font-size: 12px; user-select: none; }
-  details.sev-group > summary::-webkit-details-marker { display: none; }
-  details.sev-group > summary::before { content: "▶"; font-size: 9px; color: var(--muted); transition: transform 0.15s; display: inline-block; }
-  details.sev-group[open] > summary::before { transform: rotate(90deg); }
-  details.sev-group > summary strong { letter-spacing: 0.5px; }
-
-  details.kind-group { margin: 6px 10px; }
-  details.kind-group > summary { cursor: pointer; list-style: none; padding: 6px 8px; font-size: 11px; color: var(--muted); background: var(--panel); border-radius: 4px; user-select: none; }
-  details.kind-group > summary::-webkit-details-marker { display: none; }
-  details.kind-group > summary::before { content: "▸ "; color: var(--muted-2); }
-  details.kind-group[open] > summary::before { content: "▾ "; }
-
-  .issue-row { padding: 8px 10px; margin: 4px 0; border-left: 2px solid var(--panel-3); background: var(--panel); cursor: pointer; border-radius: 0 4px 4px 0; font-size: 11px; transition: background 0.1s, border-color 0.1s; }
-  .issue-row:hover { background: var(--panel-2); }
-  .issue-row.active { background: var(--panel-2); border-left-color: var(--accent); }
-  .issue-row .pair { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 3px; }
-  .issue-row .pair strong { color: var(--text); }
-  .issue-row .detail { color: var(--muted); font-size: 10px; }
-  .issue-row .fix { color: var(--accent); font-size: 11px; margin-top: 4px; line-height: 1.35; }
 
   .orphan-row { padding: 6px 10px; margin: 3px 0; background: var(--panel); border-radius: 4px; font-size: 11px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
   .orphan-row:hover { background: var(--panel-2); }
@@ -100,13 +117,24 @@
   #tooltip .t-name { font-weight: 600; margin-bottom: 2px; }
   #tooltip .t-desc { color: var(--muted); font-size: 10px; line-height: 1.3; }
 
-  table.stats { width: 100%; border-collapse: collapse; font-size: 12px; }
-  table.stats td { padding: 5px 4px; border-bottom: 1px solid var(--border); }
+  /* Stats view */
+  .stats-container { padding: 24px; max-width: 600px; margin: 0 auto; overflow-y: auto; height: 100%; }
+  .stats-container h2 { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+  table.stats { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.stats td { padding: 7px 6px; border-bottom: 1px solid var(--border); }
   table.stats td:first-child { color: var(--muted); }
   table.stats td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Orphans collapsible in triage */
+  details.orphans-collapsible { margin-top: 30px; border-top: 1px solid var(--border); padding-top: 14px; }
+  details.orphans-collapsible > summary { cursor: pointer; color: var(--muted); font-size: 12px; user-select: none; list-style: none; }
+  details.orphans-collapsible > summary::-webkit-details-marker { display: none; }
+  details.orphans-collapsible > summary::before { content: "▶ "; font-size: 9px; color: var(--muted-2); }
+  details.orphans-collapsible[open] > summary::before { content: "▾ "; }
 </style>
 </head>
-<body>
+<body class="view-triage">
+
 <header>
   <h1>🗺️ Claude Atlas</h1>
   <span class="health" title="Health score: 100 minus a weighted sum of issues (high×10, medium×3, low×1).">
@@ -118,8 +146,13 @@
     {{#roots_scanned}}<span class="pill">{{.}}</span>{{/roots_scanned}}
   </div>
   <div class="search">
-    <input type="search" id="search" placeholder="Search artifacts by name or path…" />
+    <input type="search" id="search" placeholder="Search issues or artifacts…" />
   </div>
+  <nav class="view-switcher" role="tablist">
+    <button class="active" data-view="triage" role="tab">Triage</button>
+    <button data-view="graph" role="tab">Graph</button>
+    <button data-view="stats" role="tab">Stats</button>
+  </nav>
 </header>
 
 <div class="legend">
@@ -136,73 +169,101 @@
 </div>
 
 <div class="filters">
-  <span class="muted-sm">kinds:</span>
-  <label><input type="checkbox" data-kind="agent" checked> agents</label>
-  <label><input type="checkbox" data-kind="skill" checked> skills</label>
-  <label><input type="checkbox" data-kind="command" checked> commands</label>
-  <label><input type="checkbox" data-kind="memory" checked> memory</label>
-  <span class="divider"></span>
+  <span class="muted-sm graph-only">kinds:</span>
+  <label class="graph-only"><input type="checkbox" data-kind="agent" checked> agents</label>
+  <label class="graph-only"><input type="checkbox" data-kind="skill" checked> skills</label>
+  <label class="graph-only"><input type="checkbox" data-kind="command" checked> commands</label>
+  <label class="graph-only"><input type="checkbox" data-kind="memory" checked> memory</label>
+  <span class="divider graph-only"></span>
   <span class="muted-sm">severity:</span>
   <label><input type="checkbox" data-sev="high" checked> high</label>
   <label><input type="checkbox" data-sev="medium" checked> medium</label>
   <label><input type="checkbox" data-sev="low" checked> low</label>
-  <span class="divider"></span>
-  <label style="margin-left:auto"><input type="checkbox" id="issues-only"> issues only</label>
+  <span class="divider graph-only"></span>
+  <label class="graph-only" style="margin-left:auto"><input type="checkbox" id="issues-only"> issues only</label>
 </div>
 
-<main id="main">
+<!-- TRIAGE VIEW (default) -->
+<section id="view-triage" class="view active">
+  <div class="triage-container">
+    <div class="triage-header">
+      <h2>Triage</h2>
+      <span class="meta">{{issues_total}} issue{{^issue_singular}}s{{/issue_singular}} across {{artifacts_total}} artifacts</span>
+    </div>
+
+    {{#has_issues}}
+      {{#issue_groups}}
+        <section class="sev-section" data-sev-section="{{severity}}">
+          <h3 class="sev-heading">
+            <span class="swatch" style="background: {{severity_color}};"></span>
+            <span class="count">{{count}}</span>
+            <span>{{severity_upper}}</span>
+          </h3>
+          {{#groups}}
+            {{#issues}}
+              <article class="issue-card sev-border-{{severity}}" data-edge-id="{{edge_id}}" data-source="{{source_id}}" data-target="{{target_id}}" data-sev="{{severity}}">
+                <div class="card-header">
+                  <span class="kind-badge">{{kind}}</span>
+                  <span class="sev-badge sev-{{severity}}">{{severity_upper}}</span>
+                  <strong>{{source_name}}</strong>
+                  <span class="arrow">↔</span>
+                  <strong>{{target_name}}</strong>
+                </div>
+                <div class="card-paths">
+                  <code>{{source_path}}</code> ↔ <code>{{target_path}}</code>
+                </div>
+                <div class="card-detail">{{detail}}</div>
+                {{#fix}}<div class="card-fix">💡 {{fix}}</div>{{/fix}}
+              </article>
+            {{/issues}}
+          {{/groups}}
+        </section>
+      {{/issue_groups}}
+    {{/has_issues}}
+    {{^has_issues}}
+      <div class="empty">
+        <span class="big">🎉</span>
+        No issues detected.
+      </div>
+    {{/has_issues}}
+
+    {{#has_orphans}}
+      <details class="orphans-collapsible">
+        <summary>{{orphans_count}} isolated artifact{{^orphans_singular}}s{{/orphans_singular}}</summary>
+        <div class="muted" style="margin: 10px 0;">
+          Artifacts with no detected relationships. Often these are CLAUDE.md files in repos
+          that don't have their own <code>.claude/</code> directory, or skills with no overlap
+          with anything else.
+        </div>
+        {{#orphans}}
+          <div class="orphan-row" data-node-id="{{id}}">
+            <span class="dot-small" style="background:{{color}}"></span>
+            <div style="flex:1; min-width: 0;">
+              <div>{{name}} <span class="muted-sm">· {{kind}} · {{scope}}</span></div>
+              <div class="meta" style="word-break: break-all;">{{path}}</div>
+            </div>
+          </div>
+        {{/orphans}}
+      </details>
+    {{/has_orphans}}
+  </div>
+</section>
+
+<!-- GRAPH VIEW (secondary) -->
+<section id="view-graph" class="view view-graph">
   <div id="cy"></div>
   <aside>
     <div class="tabs">
       <button class="active" data-tab="detail">Detail</button>
-      <button data-tab="issues">Issues <span class="count">{{issues_total}}</span></button>
       <button data-tab="orphans">Isolated <span class="count">{{orphans_count}}</span></button>
-      <button data-tab="stats">Stats</button>
     </div>
-
     <div class="tab-body" id="tab-detail">
-      <div class="empty">Click a node or an issue to inspect it.</div>
+      <div class="empty" style="padding: 20px 10px;">Click a node to inspect it.</div>
     </div>
-
-    <div class="tab-body" id="tab-issues" style="display:none">
-      {{#has_issues}}
-        {{#issue_groups}}
-          <details class="sev-group"{{#open_by_default}} open{{/open_by_default}}>
-            <summary>
-              <span class="sev-badge sev-{{severity}}">{{severity_upper}}</span>
-              <strong>{{count}}</strong>
-              <span class="muted-sm">issue(s)</span>
-            </summary>
-            {{#groups}}
-              <details class="kind-group" open>
-                <summary>{{kind}} ({{count}})</summary>
-                {{#issues}}
-                  <div class="issue-row" data-edge-id="{{edge_id}}" data-source="{{source_id}}" data-target="{{target_id}}">
-                    <div class="pair">
-                      <strong>{{source_name}}</strong>
-                      <span class="muted-sm">↔</span>
-                      <strong>{{target_name}}</strong>
-                    </div>
-                    <div class="detail">{{detail}}</div>
-                    {{#fix}}<div class="fix">💡 {{fix}}</div>{{/fix}}
-                  </div>
-                {{/issues}}
-              </details>
-            {{/groups}}
-          </details>
-        {{/issue_groups}}
-      {{/has_issues}}
-      {{^has_issues}}
-        <div class="empty">No issues detected. 🎉</div>
-      {{/has_issues}}
-    </div>
-
     <div class="tab-body" id="tab-orphans" style="display:none">
       {{#has_orphans}}
         <div class="muted" style="margin-bottom: 10px">
-          Artifacts with no detected relationships. Often these are CLAUDE.md files in repos
-          that don't have their own <code>.claude/</code> directory, or skills with no overlap
-          with anything else.
+          {{orphans_count}} artifacts with no detected relationships.
         </div>
         {{#orphans}}
           <div class="orphan-row" data-node-id="{{id}}">
@@ -218,72 +279,109 @@
         <div class="empty">No isolated artifacts.</div>
       {{/has_orphans}}
     </div>
-
-    <div class="tab-body" id="tab-stats" style="display:none">
-      <table class="stats">
-        <tbody>
-        {{#stats}}
-          <tr><td>{{key}}</td><td>{{value}}</td></tr>
-        {{/stats}}
-        </tbody>
-      </table>
-    </div>
   </aside>
-</main>
+</section>
+
+<!-- STATS VIEW -->
+<section id="view-stats" class="view">
+  <div class="stats-container">
+    <h2>Statistics</h2>
+    <table class="stats">
+      <tbody>
+      {{#stats}}
+        <tr><td>{{key}}</td><td>{{value}}</td></tr>
+      {{/stats}}
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <div id="tooltip"></div>
 
 <script>
-  const GRAPH = {{{graph_json}}};
+  const GRAPH_DATA = {{{graph_json}}};
+  let cy = null;
+  let graphLoaded = false;
 
-  const cy = cytoscape({
-    container: document.getElementById('cy'),
-    elements: [...GRAPH.nodes, ...GRAPH.edges],
-    style: [
-      { selector: 'node', style: {
-          'background-color': 'data(color)', 'label': 'data(label)', 'color': '#e5e7eb',
-          'font-size': 10, 'text-outline-color': '#0b1020', 'text-outline-width': 2,
-          'text-valign': 'bottom', 'text-halign': 'center', 'text-margin-y': 6,
-          'text-wrap': 'ellipsis', 'text-max-width': '120px',
-          'width': 22, 'height': 22, 'border-width': 1, 'border-color': '#24304a',
-          'transition-property': 'border-color, border-width, width, height, opacity',
-          'transition-duration': 120,
-      }},
-      { selector: 'node:selected, node.highlighted', style: {
-          'border-color': '#fef08a', 'border-width': 3, 'width': 30, 'height': 30,
-          'text-max-width': '240px', 'font-size': 12, 'z-index': 100,
-      }},
-      { selector: 'node[?is_orphan]', style: {
-          'border-color': '#475569', 'border-style': 'dashed',
-      }},
-      { selector: 'edge', style: {
-          'line-color': 'data(color)', 'width': 'mapData(weight, 0, 1.5, 1, 4)',
-          'curve-style': 'bezier', 'target-arrow-shape': 'none', 'opacity': 0.5,
-          'transition-property': 'opacity, width, line-color', 'transition-duration': 120,
-      }},
-      { selector: 'edge[kind = "overrides"]', style: {
-          'target-arrow-shape': 'triangle', 'target-arrow-color': 'data(color)'
-      }},
-      { selector: 'edge[?is_issue]', style: {
-          'opacity': 0.85, 'width': 'mapData(weight, 0, 2, 2, 5)'
-      }},
-      { selector: 'edge.highlighted', style: {
-          'opacity': 1, 'width': 6, 'line-color': '#fef08a'
-      }},
-      { selector: '.dimmed', style: { 'opacity': 0.06 }}
-    ],
-    layout: {
-      name: 'cose', animate: false, idealEdgeLength: 160, nodeRepulsion: 28000,
-      nodeOverlap: 50, gravity: 0.12, componentSpacing: 220, padding: 60,
-      randomize: true, fit: true,
-    },
-  });
-
-  const tabDetail = document.getElementById('tab-detail');
   function escapeHtml(s) {
     return (s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
+
+  // --- View switching ---
+  const body = document.body;
+  function setView(name) {
+    document.querySelectorAll('.view-switcher button').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === name);
+    });
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    body.className = 'view-' + name;
+    if (name === 'graph') ensureGraphLoaded();
+  }
+  document.querySelectorAll('.view-switcher button').forEach(btn => {
+    btn.addEventListener('click', () => setView(btn.dataset.view));
+  });
+
+  // --- Lazy Cytoscape load ---
+  function ensureGraphLoaded() {
+    if (graphLoaded) return;
+    graphLoaded = true;
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/cytoscape@3.30.0/dist/cytoscape.min.js';
+    script.onload = initGraph;
+    document.head.appendChild(script);
+  }
+
+  function initGraph() {
+    cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: [...GRAPH_DATA.nodes, ...GRAPH_DATA.edges],
+      style: [
+        { selector: 'node', style: {
+            'background-color': 'data(color)', 'label': 'data(label)', 'color': '#e5e7eb',
+            'font-size': 10, 'text-outline-color': '#0b1020', 'text-outline-width': 2,
+            'text-valign': 'bottom', 'text-halign': 'center', 'text-margin-y': 6,
+            'text-wrap': 'ellipsis', 'text-max-width': '120px',
+            'width': 22, 'height': 22, 'border-width': 1, 'border-color': '#24304a',
+            'transition-property': 'border-color, border-width, width, height, opacity',
+            'transition-duration': 120,
+        }},
+        { selector: 'node:selected, node.highlighted', style: {
+            'border-color': '#fef08a', 'border-width': 3, 'width': 30, 'height': 30,
+            'text-max-width': '240px', 'font-size': 12, 'z-index': 100,
+        }},
+        { selector: 'node[?is_orphan]', style: {
+            'border-color': '#475569', 'border-style': 'dashed',
+        }},
+        { selector: 'edge', style: {
+            'line-color': 'data(color)', 'width': 'mapData(weight, 0, 1.5, 1, 4)',
+            'curve-style': 'bezier', 'target-arrow-shape': 'none', 'opacity': 0.5,
+            'transition-property': 'opacity, width, line-color', 'transition-duration': 120,
+        }},
+        { selector: 'edge[kind = "overrides"]', style: {
+            'target-arrow-shape': 'triangle', 'target-arrow-color': 'data(color)'
+        }},
+        { selector: 'edge[?is_issue]', style: {
+            'opacity': 0.85, 'width': 'mapData(weight, 0, 2, 2, 5)'
+        }},
+        { selector: 'edge.highlighted', style: {
+            'opacity': 1, 'width': 6, 'line-color': '#fef08a'
+        }},
+        { selector: '.dimmed', style: { 'opacity': 0.06 }}
+      ],
+      layout: {
+        name: 'cose', animate: false, idealEdgeLength: 160, nodeRepulsion: 28000,
+        nodeOverlap: 50, gravity: 0.12, componentSpacing: 220, padding: 60,
+        randomize: true, fit: true,
+      },
+    });
+    wireGraphInteractions();
+    applyFilters();
+  }
+
+  // --- Detail panel (graph view sidebar) ---
   function renderDetail(data) {
+    const tabDetail = document.getElementById('tab-detail');
     const triggers = (data.triggers || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') || '<span class="muted-sm">(none)</span>';
     const orphanBadge = data.is_orphan ? '<span class="sev-badge sev-low" style="margin-left: 6px;">ISOLATED</span>' : '';
     tabDetail.innerHTML = `
@@ -302,32 +400,81 @@
       <div class="muted" style="margin-top:10px">body preview</div>
       <pre>${escapeHtml(data.body_preview || '')}</pre>
     `;
-    switchTab('detail');
+    switchSidebarTab('detail');
   }
 
-  function switchTab(tabName) {
-    document.querySelectorAll('.tabs button').forEach(b => {
+  function switchSidebarTab(tabName) {
+    document.querySelectorAll('aside .tabs button').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === tabName);
     });
-    ['detail', 'issues', 'orphans', 'stats'].forEach(t => {
+    ['detail', 'orphans'].forEach(t => {
       const el = document.getElementById('tab-' + t);
       if (el) el.style.display = (t === tabName) ? 'block' : 'none';
     });
   }
-  document.querySelectorAll('.tabs button').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  document.querySelectorAll('aside .tabs button').forEach(btn => {
+    btn.addEventListener('click', () => switchSidebarTab(btn.dataset.tab));
   });
 
-  cy.on('tap', 'node', evt => renderDetail(evt.target.data()));
-  cy.on('tap', evt => {
-    if (evt.target === cy) clearHighlight();
-  });
+  function wireGraphInteractions() {
+    cy.on('tap', 'node', evt => renderDetail(evt.target.data()));
+    cy.on('tap', evt => { if (evt.target === cy) clearHighlight(); });
+
+    const tooltip = document.getElementById('tooltip');
+    cy.on('mouseover', 'node', evt => {
+      const data = evt.target.data();
+      const desc = data.description ? data.description.slice(0, 140) + (data.description.length > 140 ? '…' : '') : '';
+      tooltip.innerHTML = `
+        <div class="t-name">${escapeHtml(data.label)} <span class="muted-sm">· ${data.kind}</span></div>
+        ${desc ? `<div class="t-desc">${escapeHtml(desc)}</div>` : ''}
+      `;
+      tooltip.classList.add('visible');
+    });
+    cy.on('mouseout', 'node', () => tooltip.classList.remove('visible'));
+    document.getElementById('cy').addEventListener('mousemove', evt => {
+      if (!tooltip.classList.contains('visible')) return;
+      tooltip.style.left = (evt.clientX + 12) + 'px';
+      tooltip.style.top = (evt.clientY + 12) + 'px';
+    });
+
+    document.querySelectorAll('#view-graph .orphan-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const node = cy.getElementById(row.dataset.nodeId);
+        if (node.length === 0) return;
+        cy.elements().addClass('dimmed');
+        node.removeClass('dimmed').addClass('highlighted');
+        cy.animate({ center: { eles: node }, zoom: 1.5, duration: 300 });
+        renderDetail(node.data());
+      });
+    });
+  }
 
   function clearHighlight() {
+    if (!cy) return;
     cy.elements().removeClass('highlighted dimmed');
-    document.querySelectorAll('.issue-row.active').forEach(r => r.classList.remove('active'));
   }
+
+  // --- Triage interactions ---
+  document.querySelectorAll('#view-triage .issue-card').forEach(card => {
+    card.addEventListener('click', () => {
+      // Switch to graph and highlight the pair
+      setView('graph');
+      if (cy) {
+        highlightPair(card.dataset.source, card.dataset.target);
+      } else {
+        // Wait for graph init then highlight
+        const tries = setInterval(() => {
+          if (cy) {
+            clearInterval(tries);
+            highlightPair(card.dataset.source, card.dataset.target);
+          }
+        }, 100);
+      }
+    });
+  });
+
   function highlightPair(sourceId, targetId) {
+    if (!cy) return;
     clearHighlight();
     const src = cy.getElementById(sourceId);
     const tgt = cy.getElementById(targetId);
@@ -339,51 +486,27 @@
     cy.animate({ fit: { eles: src.union(tgt), padding: 150 }, duration: 300 });
   }
 
-  document.querySelectorAll('.issue-row').forEach(row => {
-    row.addEventListener('click', () => {
-      document.querySelectorAll('.issue-row.active').forEach(r => r.classList.remove('active'));
-      row.classList.add('active');
-      highlightPair(row.dataset.source, row.dataset.target);
-    });
-  });
-
-  document.querySelectorAll('.orphan-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const node = cy.getElementById(row.dataset.nodeId);
-      if (node.length === 0) return;
-      cy.elements().addClass('dimmed');
-      node.removeClass('dimmed').addClass('highlighted');
-      cy.animate({ center: { eles: node }, zoom: 1.5, duration: 300 });
-      renderDetail(node.data());
-    });
-  });
-
-  const tooltip = document.getElementById('tooltip');
-  cy.on('mouseover', 'node', evt => {
-    const data = evt.target.data();
-    const desc = data.description ? data.description.slice(0, 140) + (data.description.length > 140 ? '…' : '') : '';
-    tooltip.innerHTML = `
-      <div class="t-name">${escapeHtml(data.label)} <span class="muted-sm">· ${data.kind}</span></div>
-      ${desc ? `<div class="t-desc">${escapeHtml(desc)}</div>` : ''}
-    `;
-    tooltip.classList.add('visible');
-  });
-  cy.on('mouseout', 'node', () => tooltip.classList.remove('visible'));
-  document.getElementById('cy').addEventListener('mousemove', evt => {
-    if (!tooltip.classList.contains('visible')) return;
-    tooltip.style.left = (evt.clientX + 12) + 'px';
-    tooltip.style.top = (evt.clientY + 12) + 'px';
-  });
-
+  // --- Filters ---
   function applyFilters() {
-    const activeKinds = new Set(
-      Array.from(document.querySelectorAll('.filters input[data-kind]:checked')).map(el => el.dataset.kind)
-    );
     const activeSevs = new Set(
       Array.from(document.querySelectorAll('.filters input[data-sev]:checked')).map(el => el.dataset.sev)
     );
-    const issuesOnly = document.getElementById('issues-only').checked;
 
+    // Triage: hide cards whose severity is not active. Hide entire sev-sections if all hidden.
+    document.querySelectorAll('#view-triage .issue-card').forEach(card => {
+      card.style.display = activeSevs.has(card.dataset.sev) ? '' : 'none';
+    });
+    document.querySelectorAll('#view-triage .sev-section').forEach(sec => {
+      const sev = sec.dataset.sevSection;
+      sec.style.display = activeSevs.has(sev) ? '' : 'none';
+    });
+
+    // Graph (only if cy is loaded)
+    if (!cy) return;
+    const activeKinds = new Set(
+      Array.from(document.querySelectorAll('.filters input[data-kind]:checked')).map(el => el.dataset.kind)
+    );
+    const issuesOnly = document.getElementById('issues-only').checked;
     cy.batch(() => {
       cy.nodes().forEach(n => {
         n.removeClass('dimmed');
@@ -400,22 +523,36 @@
         if (s.hasClass('dimmed') || t.hasClass('dimmed')) e.addClass('dimmed');
       });
     });
-
-    document.querySelectorAll('details.sev-group').forEach(group => {
-      const sev = group.querySelector('.sev-badge').className.match(/sev-(\w+)/)[1];
-      group.style.display = activeSevs.has(sev) ? '' : 'none';
-    });
   }
   document.querySelectorAll('.filters input').forEach(el => el.addEventListener('change', applyFilters));
 
+  // --- Search ---
   const searchInput = document.getElementById('search');
   searchInput.addEventListener('input', () => {
     const q = searchInput.value.trim().toLowerCase();
+    // Triage filter
+    document.querySelectorAll('#view-triage .issue-card').forEach(card => {
+      if (!q) { card.style.display = ''; return; }
+      const text = card.textContent.toLowerCase();
+      card.style.display = text.includes(q) ? '' : 'none';
+    });
+    // Re-apply severity filter on top
+    if (q) {
+      const activeSevs = new Set(
+        Array.from(document.querySelectorAll('.filters input[data-sev]:checked')).map(el => el.dataset.sev)
+      );
+      document.querySelectorAll('#view-triage .issue-card').forEach(card => {
+        if (card.style.display === 'none') return;
+        if (!activeSevs.has(card.dataset.sev)) card.style.display = 'none';
+      });
+    } else {
+      applyFilters();
+    }
+    // Graph search
+    if (!cy) return;
     if (!q) {
       cy.nodes().removeClass('dimmed');
       applyFilters();
-      document.querySelectorAll('.issue-row').forEach(r => r.style.display = '');
-      document.querySelectorAll('.orphan-row').forEach(r => r.style.display = '');
       return;
     }
     cy.batch(() => {
@@ -429,21 +566,6 @@
         const s = e.source(), t = e.target();
         e.toggleClass('dimmed', s.hasClass('dimmed') || t.hasClass('dimmed'));
       });
-    });
-    document.querySelectorAll('.issue-row').forEach(r => {
-      const text = r.textContent.toLowerCase();
-      r.style.display = text.includes(q) ? '' : 'none';
-    });
-    document.querySelectorAll('.orphan-row').forEach(r => {
-      const text = r.textContent.toLowerCase();
-      r.style.display = text.includes(q) ? '' : 'none';
-    });
-  });
-
-  const main = document.getElementById('main');
-  document.querySelectorAll('.tabs button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      main.classList.toggle('sidebar-wide', btn.dataset.tab === 'detail');
     });
   });
 </script>
