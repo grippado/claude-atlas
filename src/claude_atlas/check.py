@@ -79,23 +79,43 @@ def _meets_threshold(severity: str, threshold: str) -> bool:
     return _SEVERITY_RANK.get(severity, 0) >= _SEVERITY_RANK.get(threshold, 0)
 
 
-def _summary_line(rows: list[dict], total_artifacts: int) -> str:
+def _summary_line(
+    rows: list[dict],
+    total_artifacts: int,
+    health_score: int | None = None,
+    health_grade: str | None = None,
+) -> str:
+    suffix = (
+        f" Health: {health_score}/100 ({health_grade})."
+        if health_score is not None
+        else ""
+    )
     if not rows:
-        return f"No issues detected in {total_artifacts} artifacts."
+        return f"No issues detected in {total_artifacts} artifacts.{suffix}"
     counts = Counter(r["severity"] for r in rows)
     parts = []
     for sev in (Severity.HIGH.value, Severity.MEDIUM.value, Severity.LOW.value):
         if counts.get(sev, 0):
             parts.append(f"{counts[sev]} {sev}")
     breakdown = ", ".join(parts) if parts else "0"
-    return f"Found {len(rows)} issues ({breakdown}) in {total_artifacts} artifacts."
+    return (
+        f"Found {len(rows)} issues ({breakdown}) in {total_artifacts} artifacts."
+        + suffix
+    )
 
 
-def format_text(rows: list[dict], total_artifacts: int, top: int, quiet: bool) -> str:
+def format_text(
+    rows: list[dict],
+    total_artifacts: int,
+    top: int,
+    quiet: bool,
+    health_score: int | None = None,
+    health_grade: str | None = None,
+) -> str:
     if quiet:
-        return _summary_line(rows, total_artifacts)
+        return _summary_line(rows, total_artifacts, health_score, health_grade)
     if not rows:
-        return _summary_line(rows, total_artifacts)
+        return _summary_line(rows, total_artifacts, health_score, health_grade)
     shown = rows if top == 0 else rows[:top]
     lines: list[str] = []
     for r in shown:
@@ -106,19 +126,28 @@ def format_text(rows: list[dict], total_artifacts: int, top: int, quiet: bool) -
         if r["fix"]:
             lines.append(f"    💡 {r['fix']}")
         lines.append("")
-    summary = _summary_line(rows, total_artifacts)
+    summary = _summary_line(rows, total_artifacts, health_score, health_grade)
     if top > 0 and len(rows) > top:
         summary += f" Showing top {top}; pass --top 0 for all."
     lines.append(summary)
     return "\n".join(lines)
 
 
-def format_json(rows: list[dict], total_artifacts: int, top: int, quiet: bool) -> str:
+def format_json(
+    rows: list[dict],
+    total_artifacts: int,
+    top: int,
+    quiet: bool,
+    health_score: int = 100,
+    health_grade: str = "A",
+) -> str:
     counts = Counter(r["severity"] for r in rows)
     payload = {
         "summary": {
             "total_issues": len(rows),
             "total_artifacts": total_artifacts,
+            "health_score": health_score,
+            "health_grade": health_grade,
             "by_severity": {
                 "high": counts.get(Severity.HIGH.value, 0),
                 "medium": counts.get(Severity.MEDIUM.value, 0),
@@ -130,9 +159,16 @@ def format_json(rows: list[dict], total_artifacts: int, top: int, quiet: bool) -
     return json.dumps(payload, indent=2)
 
 
-def format_github(rows: list[dict], total_artifacts: int, top: int, quiet: bool) -> str:
+def format_github(
+    rows: list[dict],
+    total_artifacts: int,
+    top: int,
+    quiet: bool,
+    health_score: int | None = None,
+    health_grade: str | None = None,
+) -> str:
     if quiet:
-        return _summary_line(rows, total_artifacts)
+        return _summary_line(rows, total_artifacts, health_score, health_grade)
     shown = rows if top == 0 else rows[:top]
     lines: list[str] = []
     for r in shown:
@@ -144,7 +180,7 @@ def format_github(rows: list[dict], total_artifacts: int, top: int, quiet: bool)
         msg = f"{r['kind_label']}: {r['detail']} (paired with {r['target_path']})"
         msg = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
         lines.append(f"::{level} file={r['source_path']}::{msg}")
-    lines.append(_summary_line(rows, total_artifacts))
+    lines.append(_summary_line(rows, total_artifacts, health_score, health_grade))
     return "\n".join(lines)
 
 
@@ -164,13 +200,20 @@ def run_check(
     rows = _filter_and_sort_issues(result)
     total_artifacts = len(result.artifacts)
 
-    formatters = {
-        "text": format_text,
-        "json": format_json,
-        "github": format_github,
-    }
-    formatter = formatters.get(output_format, format_text)
-    output = formatter(rows, total_artifacts, top, quiet)
+    score = result.health_score()
+    grade = result.health_grade()
+    if output_format == "json":
+        output = format_json(
+            rows, total_artifacts, top, quiet, health_score=score, health_grade=grade
+        )
+    elif output_format == "github":
+        output = format_github(
+            rows, total_artifacts, top, quiet, health_score=score, health_grade=grade
+        )
+    else:
+        output = format_text(
+            rows, total_artifacts, top, quiet, health_score=score, health_grade=grade
+        )
 
     out = stream if stream is not None else sys.stdout
     out.write(output)

@@ -26,6 +26,9 @@
   header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   header h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.2px; }
   header .summary { font-size: 12px; color: var(--muted); }
+  header .health { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); background: var(--panel); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+  header .health .grade { font-weight: 600; }
+  header .health .dot { width: 8px; height: 8px; border-radius: 50%; }
   header .pills { display: flex; gap: 6px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
   header .pill { background: var(--panel); border: 1px solid var(--border); padding: 3px 9px; border-radius: 999px; }
   header .search { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: 0 1 360px; }
@@ -106,6 +109,10 @@
 <body>
 <header>
   <h1>🗺️ Claude Atlas</h1>
+  <span class="health" title="Health score: 100 minus a weighted sum of issues (high×10, medium×3, low×1).">
+    <span class="dot" style="background: {{health_color}};"></span>
+    Health <span class="grade">{{health_score}}/100 ({{health_grade}})</span>
+  </span>
   <span class="summary">{{artifacts_total}} artifacts · {{issues_total}} issues</span>
   <div class="pills">
     {{#roots_scanned}}<span class="pill">{{.}}</span>{{/roots_scanned}}

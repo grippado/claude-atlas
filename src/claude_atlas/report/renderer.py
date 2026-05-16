@@ -198,6 +198,12 @@ def render_html(result: ScanResult, output_path: Path) -> Path:
 
     stats_rows = [{"key": k, "value": v} for k, v in sorted(stats.items())]
 
+    score = result.health_score()
+    grade = result.health_grade()
+    health_color = (
+        "#34d399" if score >= 75 else "#eab308" if score >= 50 else "#ef4444"
+    )
+
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     html = chevron.render(
         template,
@@ -212,6 +218,9 @@ def render_html(result: ScanResult, output_path: Path) -> Path:
             "roots_scanned": [str(p) for p in result.roots_scanned],
             "artifacts_total": stats.get("artifacts_total", 0),
             "issues_total": stats.get("issues_total", 0),
+            "health_score": score,
+            "health_grade": grade,
+            "health_color": health_color,
         },
     )
 
