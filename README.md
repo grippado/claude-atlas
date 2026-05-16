@@ -17,20 +17,28 @@ If you've been building out `~/.claude/` for a while, you probably have:
 - A global skill quietly shadowed by a project-scoped version in one of your repos.
 - No clear picture of how many artifacts you've accumulated total.
 
-**Claude Atlas scans your setup and surfaces these in seconds.** Run it in your terminal for a quick health check, or generate an interactive HTML report for deeper triage.
+**Claude Atlas scans your setup and surfaces these in seconds.** Run it in your terminal for a quick health check, or generate an interactive HTML triage dashboard for deeper work.
 
 ```bash
 # Install
 uv tool install claude-atlas
 
-# 5-second health check
+# 5-second health check (with a 0-100 health score)
 claude-atlas check
 
-# Full interactive report
+# Full triage dashboard
 claude-atlas scan
 ```
 
-Offline by default. MIT licensed. Docs in EN + PT-BR.
+You get:
+
+- A **health score** (0-100) so you can tell at a glance whether your setup is getting better or worse over time.
+- A **triage dashboard** with side-by-side previews of each conflicting pair, one-click "Copy fix prompt for Claude Code", and a "Show diff" toggle.
+- A **`fix` command** that hands you a ready-to-paste prompt for Claude Code — without ever touching your files itself.
+- A **`check --since`** flag that diffs against a previous run so you can prove a refactor actually helped.
+- A **pre-commit hook** to keep new conflicts from sneaking in.
+
+Offline by default. No telemetry. MIT licensed. Docs in EN + PT-BR.
 
 ## Install
 
@@ -86,7 +94,12 @@ claude-atlas scan --auto-discover ~/work --auto-discover ~/personal
 claude-atlas scan --semantic
 ```
 
-Open the resulting HTML in a browser. Click nodes to inspect, switch to the **Issues** tab to see what needs attention.
+Open the resulting HTML in a browser. The report opens on the **Triage** view:
+
+- Issues grouped by severity (high / medium / low), each rendered as a card with the two artifacts' frontmatter and body excerpts side by side.
+- Per-card actions: **Open source / target** in your editor, **Show diff**, **Copy fix prompt** (with or without the diff), **Skip** to dismiss false-positives — skip state persists in your browser via `localStorage`.
+- A small **concentration treemap** at the top shows where the problems cluster (by scope × kind); click a cell to filter the cards.
+- The **Graph** tab is still available for relationship exploration — lazy-loaded so the report stays light if you stick to triage.
 
 ## What it detects
 
@@ -172,6 +185,8 @@ claude-atlas fix | pbcopy                 # copy prompt to clipboard (macOS)
 
 The interactive picker accepts comma/range syntax: `1,3,5-7` picks issues 1, 3, 5, 6, 7. Pass `all` (or just press Enter) to take everything, `q` to cancel.
 
+If you'd rather pick visually, open the HTML report and use **Copy fix prompt** (or **Copy prompt + diff**) on individual cards — same output, one issue at a time.
+
 ### As a [pre-commit](https://pre-commit.com) hook
 
 Add to your `.pre-commit-config.yaml`:
@@ -206,11 +221,14 @@ src/claude_atlas/
 
 ## Roadmap
 
-Claude-atlas is in active evolution. See the full [ROADMAP.md](ROADMAP.md) for principles, released versions, and what's planned.
+Claude-atlas is in active evolution. See the full [ROADMAP.md](ROADMAP.md) for principles, released versions, and what's planned. Live tracker: [GitHub Milestones](https://github.com/grippado/claude-atlas/milestones).
 
-**Next up: v0.4.0 — HTML triage dashboard.** The graph view becomes a secondary tab; the primary view becomes a card-based triage dashboard with health score, side-by-side previews, and per-issue actions. Follow progress in [#1](https://github.com/grippado/claude-atlas/issues/1).
+**Shipped recently:**
+- **v0.5.1** — `Show diff` per issue + `Copy prompt + diff` for sharper Claude Code fixes.
+- **v0.5.0** — HTML triage dashboard: triage view as default, side-by-side previews, per-issue actions, concentration treemap, graph as a lazy-loaded secondary tab.
+- **v0.4.0** — Backend foundation: health score, `check --since` diff, `fix` command, pre-commit hook templates.
 
-**Considering:** interactive fix-prompt export (`claude-atlas fix`), scan history diffing, pre-commit hook templates, editor status-bar plugin.
+**Considering:** editor status-bar plugin (VS Code) for ambient health-score awareness.
 
 **Won't do:** automatic editing/deletion of artifacts, cloud sync, accounts, or support for non-Claude-Code AI tools. See the [anti-roadmap](ROADMAP.md#anti-roadmap-wont-do) for why.
 
