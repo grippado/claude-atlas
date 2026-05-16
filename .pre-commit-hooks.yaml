@@ -1,0 +1,17 @@
+- id: claude-atlas
+  name: claude-atlas check
+  description: Scan your .claude/ setup for duplicates, overrides, and trigger collisions.
+  entry: claude-atlas check --quiet
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit, pre-push, manual]
+
+- id: claude-atlas-strict
+  name: claude-atlas check (strict)
+  description: Same as claude-atlas, but fails on medium-severity issues too.
+  entry: claude-atlas check --max-severity medium --quiet
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit, pre-push, manual]
