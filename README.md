@@ -115,6 +115,8 @@ uv tool install "claude-atlas[semantic]"
 
 ```text
 claude-atlas scan        full scan + report
+claude-atlas check       lint-style health check (CI-friendly)
+claude-atlas fix         generate a Claude Code prompt for selected issues
 claude-atlas report      alias for scan with default flags
 claude-atlas version     print version
 ```
@@ -156,6 +158,19 @@ claude-atlas check --since /tmp/atlas-snap.json
 ```
 
 Useful before/after big refactors to confirm you actually moved the needle.
+
+### Generate a fix prompt for Claude Code
+
+`claude-atlas fix` turns detected issues into a markdown prompt you paste into Claude Code. The tool itself never edits files — it just hands you the prompt.
+
+```bash
+claude-atlas fix                          # interactive picker
+claude-atlas fix --all                    # include every issue, no prompt
+claude-atlas fix --severity high --all    # all HIGH-severity issues
+claude-atlas fix | pbcopy                 # copy prompt to clipboard (macOS)
+```
+
+The interactive picker accepts comma/range syntax: `1,3,5-7` picks issues 1, 3, 5, 6, 7. Pass `all` (or just press Enter) to take everything, `q` to cancel.
 
 ### As a [pre-commit](https://pre-commit.com) hook
 

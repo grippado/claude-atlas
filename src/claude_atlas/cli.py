@@ -12,6 +12,7 @@ from claude_atlas import __version__
 from claude_atlas.analysis.graph import build_all_edges
 from claude_atlas.analysis.llm_judge import DEFAULT_MODEL, refine_with_llm
 from claude_atlas.check import run_check
+from claude_atlas.fix import build_prompt, collect_issues, parse_selection
 from claude_atlas.models import ScanResult, Severity
 from claude_atlas.report.renderer import render_html
 from claude_atlas.scanner.discovery import resolve_scan_targets
@@ -205,6 +206,115 @@ def check(
         since=since_data,
     )
     raise typer.Exit(exit_code)
+
+
+@app.command()
+def fix(
+    paths: list[Path] = typer.Option(
+        None, "--paths", "-p",
+        help="Explicit .claude/ dirs or repo dirs to scan. Repeatable.",
+    ),
+    auto_discover: list[Path] = typer.Option(
+        None, "--auto-discover", "-a",
+        help="Trees to walk looking for nested .claude/ dirs. Repeatable.",
+    ),
+    no_global: bool = typer.Option(False, "--no-global", help="Skip scanning ~/.claude."),
+    max_depth: int = typer.Option(4, "--max-depth", help="Max walk depth."),
+    no_memory: bool = typer.Option(False, "--no-memory", help="Skip CLAUDE.md memory files."),
+    all_issues: bool = typer.Option(
+        False, "--all",
+        help="Skip the picker and include every detected issue.",
+    ),
+    severity: str = typer.Option(
+        None, "--severity",
+        help="Pre-filter to a single severity before selecting. "
+             "One of: low, medium, high.",
+    ),
+) -> None:
+    """
+    Generate a Claude Code prompt to triage detected issues.
+
+    Scans your setup, lets you pick which issues to address, and writes a
+    consolidated markdown prompt to stdout. Pipe it to your clipboard or
+    paste it into Claude Code — the tool never edits files itself.
+
+    Examples:
+      claude-atlas fix                          # interactive picker
+      claude-atlas fix --all                    # include every issue
+      claude-atlas fix --severity high --all    # all HIGH issues, no picker
+      claude-atlas fix | pbcopy                 # copy prompt to clipboard (macOS)
+    """
+    paths = paths or []
+    auto_discover = auto_discover or []
+
+    if severity is not None and severity not in {s.value for s in Severity if s != Severity.NONE}:
+        console.print(
+            f"[bold red]error:[/bold red] --severity must be one of "
+            f"low/medium/high, got {severity!r}",
+            highlight=False,
+        )
+        raise typer.Exit(2)
+
+    try:
+        result = _run_scan(
+            paths=paths, no_global=no_global, auto_discover=auto_discover,
+            max_depth=max_depth, include_memory=not no_memory,
+        )
+    except Exception as e:
+        console.print(f"[bold red]scan failed:[/bold red] {e}", highlight=False)
+        raise typer.Exit(2) from e
+
+    rows = collect_issues(result, severity=severity)
+
+    if not rows:
+        msg = "No issues to fix"
+        if severity:
+            msg += f" at severity {severity!r}"
+        console.print(f"[bold green]✓[/bold green] {msg}.")
+        raise typer.Exit(0)
+
+    if all_issues:
+        selected = rows
+    else:
+        selected = _interactive_pick(rows)
+        if not selected:
+            console.print("[yellow]No selection — exiting without a prompt.[/yellow]")
+            raise typer.Exit(0)
+
+    prompt = build_prompt(selected)
+    typer.echo(prompt)
+
+
+def _interactive_pick(rows: list[dict]) -> list[dict]:
+    """Render a numbered table and prompt the user for a selection."""
+    from rich.prompt import Prompt
+
+    table = Table(title=f"{len(rows)} issue(s) detected", title_style="bold")
+    table.add_column("#", style="dim", width=3, justify="right")
+    table.add_column("severity")
+    table.add_column("kind")
+    table.add_column("source")
+    table.add_column("target")
+    for i, r in enumerate(rows, start=1):
+        sev = r["severity"]
+        color = {"high": "red", "medium": "yellow", "low": "cyan"}.get(sev, "white")
+        table.add_row(
+            str(i),
+            f"[{color}]{sev}[/{color}]",
+            r["kind_label"],
+            r["source_name"],
+            r["target_name"],
+        )
+    console.print(table)
+    console.print(
+        "[dim]Selection grammar: '1,3,5-7' / 'all' / 'q' to quit. "
+        "Empty input = all.[/dim]",
+        highlight=False,
+    )
+
+    spec = Prompt.ask("Select", default="all", console=console)
+    indices = parse_selection(spec, len(rows))
+    return [rows[i] for i in indices]
 
 
 @app.command()
