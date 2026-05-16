@@ -137,6 +137,39 @@ def test_discovery_and_parsers() -> None:
         assert kinds == {ArtifactKind.AGENT, ArtifactKind.SKILL, ArtifactKind.COMMAND}
 
 
+def test_scan_claude_dir_dedupes_symlinks_to_same_target() -> None:
+    """Symlinks pointing to the same real file must not produce duplicate artifacts.
+
+    Regression for false-positive ``duplicate_exact`` edges in aliasing
+    setups (e.g. ``organize.md -> organize:notes.md -> vault/organize.md``).
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        claude = tmp_path / ".claude"
+        commands = claude / "commands"
+        commands.mkdir(parents=True)
+
+        # Real file plus two symlinks pointing at it.
+        real = commands / "organize.md"
+        real.write_text(
+            "---\nname: organize\ndescription: organize stuff\n---\nBody for organize."
+        )
+        alias_scoped = commands / "organize:notes.md"
+        alias_scoped.symlink_to(real)
+        alias_outer = tmp_path / "outer-alias.md"
+        alias_outer.symlink_to(alias_scoped)
+        # Place a symlink chain entry inside commands/ too, to exercise dedupe.
+        chained = commands / "z-alias.md"
+        chained.symlink_to(alias_scoped)
+
+        artifacts = scan_claude_dir(claude)
+        command_artifacts = [a for a in artifacts if a.kind == ArtifactKind.COMMAND]
+        # Three entries on disk, all pointing to the same real file → 1 artifact.
+        assert len(command_artifacts) == 1
+        # First path alphabetically (organize.md) wins.
+        assert command_artifacts[0].path.name == "organize.md"
+
+
 def test_parse_artifact_file_handles_no_frontmatter() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
