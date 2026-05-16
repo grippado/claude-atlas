@@ -1,6 +1,8 @@
 # Roadmap
 
 > **Idiomas:** [English](ROADMAP.md) · [Português 🇧🇷](ROADMAP.pt-BR.md)
+>
+> **Tracker ao vivo:** [GitHub Milestones](https://github.com/grippado/claude-atlas/milestones) — cada bullet abaixo aponta para a issue correspondente.
 
 ## Princípios
 
@@ -37,12 +39,12 @@ A v0.4.0 inverte a prioridade: **o dashboard vira a view principal; o grafo vira
 
 ### O que muda
 
-- **Triage view como default.** Issues renderizadas como cards completos na área central, não numa lista apertada no sidebar.
-- **Preview lado a lado.** Cada card mostra frontmatter e trecho do body dos dois artefatos um ao lado do outro, pra comparar sem abrir arquivos.
-- **Health score.** Um número de 0 a 100 no topo, calculado pelo nº de issues ponderado por severidade. Dá sensação rápida de "isso está melhorando ou piorando ao longo do tempo?".
-- **Ações por issue.** Cada card tem botões `[skip]`, `[open in editor]` e `[copy fix prompt]`. O skip persiste localmente, então você dispensa falsos-positivos conhecidos.
-- **Overview de concentração.** Um treemap pequeno por scope → kind, dimensionado por densidade de issues. Substitui o grafo como resposta instantânea pra "onde estão concentrados os problemas?".
-- **Grafo como aba secundária.** Ainda disponível, ainda útil pra explorar relacionamentos. Só não é mais a porta de entrada.
+- **Triage view como default.** ([#9](https://github.com/grippado/claude-atlas/issues/9)) Issues renderizadas como cards completos na área central, não numa lista apertada no sidebar.
+- **Preview lado a lado.** ([#10](https://github.com/grippado/claude-atlas/issues/10)) Cada card mostra frontmatter e trecho do body dos dois artefatos um ao lado do outro, pra comparar sem abrir arquivos.
+- **Health score.** ([#8](https://github.com/grippado/claude-atlas/issues/8)) Um número de 0 a 100 no topo, calculado pelo nº de issues ponderado por severidade. Dá sensação rápida de "isso está melhorando ou piorando ao longo do tempo?".
+- **Ações por issue.** ([#11](https://github.com/grippado/claude-atlas/issues/11)) Cada card tem botões `[skip]`, `[open in editor]` e `[copy fix prompt]`. O skip persiste localmente, então você dispensa falsos-positivos conhecidos.
+- **Overview de concentração.** ([#12](https://github.com/grippado/claude-atlas/issues/12)) Um treemap pequeno por scope → kind, dimensionado por densidade de issues. Substitui o grafo como resposta instantânea pra "onde estão concentrados os problemas?".
+- **Grafo como aba secundária.** ([#13](https://github.com/grippado/claude-atlas/issues/13)) Ainda disponível, ainda útil pra explorar relacionamentos. Só não é mais a porta de entrada.
 
 ### Wireframe
 
@@ -91,10 +93,10 @@ A v0.4.0 inverte a prioridade: **o dashboard vira a view principal; o grafo vira
 
 Documentado mas sem compromisso. Ordem é prioridade aproximada.
 
-- **`claude-atlas fix --interactive`** — versão de terminal do botão `[copy fix prompt]`. Escolhe issues, recebe prompt markdown pronto pro Claude Code.
-- **Histórico / diff de scans.** `claude-atlas check --since last` mostraria o que mudou no seu setup desde o último scan. Útil pra "meu refactor melhorou as coisas ou não?".
-- **Templates de pre-commit hook.** Um `.pre-commit-hooks.yaml` pra usuários adicionarem `claude-atlas check` em seus repos com uma linha.
-- **Plugin de status bar pra editor.** Extensão pequena do VS Code que roda `check --quiet` e mostra o health score. Bônus: click abre o relatório HTML completo.
+- **`claude-atlas fix --interactive`** ([#14](https://github.com/grippado/claude-atlas/issues/14)) — versão de terminal do botão `[copy fix prompt]`. Escolhe issues, recebe prompt markdown pronto pro Claude Code.
+- **Histórico / diff de scans.** ([#15](https://github.com/grippado/claude-atlas/issues/15)) `claude-atlas check --since last` mostraria o que mudou no seu setup desde o último scan. Útil pra "meu refactor melhorou as coisas ou não?".
+- **Templates de pre-commit hook.** ([#16](https://github.com/grippado/claude-atlas/issues/16)) Um `.pre-commit-hooks.yaml` pra usuários adicionarem `claude-atlas check` em seus repos com uma linha.
+- **Plugin de status bar pra editor.** ([#17](https://github.com/grippado/claude-atlas/issues/17)) Extensão pequena do VS Code que roda `check --quiet` e mostra o health score. Bônus: click abre o relatório HTML completo.
 
 ## Anti-roadmap (não vamos fazer)
 
