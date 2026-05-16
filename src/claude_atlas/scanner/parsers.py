@@ -150,33 +150,44 @@ def parse_artifact_file(
 
 
 def scan_claude_dir(root: Path) -> list[Artifact]:
-    """Walk a single .claude/ root and return all artifacts inside it."""
+    """Walk a single .claude/ root and return all artifacts inside it.
+
+    Symlinks pointing to the same real file are collapsed into a single
+    artifact (the first path encountered, ordered alphabetically). This
+    avoids spurious ``duplicate_exact`` edges from intentional aliasing
+    setups (e.g. a global alias symlinked to a scoped command file).
+    """
     root = root.resolve()
     artifacts: list[Artifact] = []
+    seen_real_paths: set[Path] = set()
+
+    def _scan(md_files: list[Path], kind: ArtifactKind) -> None:
+        for md in md_files:
+            try:
+                real = md.resolve()
+            except OSError:
+                continue
+            if real in seen_real_paths:
+                continue
+            seen_real_paths.add(real)
+            a = parse_artifact_file(md, kind, root)
+            if a:
+                artifacts.append(a)
 
     # Agents: .claude/agents/*.md
     agents_dir = root / "agents"
     if agents_dir.is_dir():
-        for md in sorted(agents_dir.rglob("*.md")):
-            a = parse_artifact_file(md, ArtifactKind.AGENT, root)
-            if a:
-                artifacts.append(a)
+        _scan(sorted(agents_dir.rglob("*.md")), ArtifactKind.AGENT)
 
     # Skills: .claude/skills/<n>/SKILL.md
     skills_dir = root / "skills"
     if skills_dir.is_dir():
-        for skill_md in sorted(skills_dir.rglob("SKILL.md")):
-            a = parse_artifact_file(skill_md, ArtifactKind.SKILL, root)
-            if a:
-                artifacts.append(a)
+        _scan(sorted(skills_dir.rglob("SKILL.md")), ArtifactKind.SKILL)
 
     # Commands: .claude/commands/**/*.md  (supports nested namespaces)
     commands_dir = root / "commands"
     if commands_dir.is_dir():
-        for md in sorted(commands_dir.rglob("*.md")):
-            a = parse_artifact_file(md, ArtifactKind.COMMAND, root)
-            if a:
-                artifacts.append(a)
+        _scan(sorted(commands_dir.rglob("*.md")), ArtifactKind.COMMAND)
 
     return artifacts
 

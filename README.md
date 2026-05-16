@@ -194,7 +194,7 @@ Add to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/grippado/claude-atlas
-    rev: v0.5.1  # or any tag from https://github.com/grippado/claude-atlas/releases
+    rev: v0.5.2  # or any tag from https://github.com/grippado/claude-atlas/releases
     hooks:
       - id: claude-atlas           # fails only on HIGH severity
       # - id: claude-atlas-strict  # fails on MEDIUM and HIGH
@@ -224,6 +224,7 @@ src/claude_atlas/
 Claude-atlas is in active evolution. See the full [ROADMAP.md](ROADMAP.md) for principles, released versions, and what's planned. Live tracker: [GitHub Milestones](https://github.com/grippado/claude-atlas/milestones).
 
 **Shipped recently:**
+- **v0.5.2** — Scanner dedupes artifacts by real path, eliminating false-positive `duplicate_exact` edges from symlinked commands/agents/skills.
 - **v0.5.1** — `Show diff` per issue + `Copy prompt + diff` for sharper Claude Code fixes.
 - **v0.5.0** — HTML triage dashboard: triage view as default, side-by-side previews, per-issue actions, concentration treemap, graph as a lazy-loaded secondary tab.
 - **v0.4.0** — Backend foundation: health score, `check --since` diff, `fix` command, pre-commit hook templates.
