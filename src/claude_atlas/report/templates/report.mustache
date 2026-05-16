@@ -107,6 +107,18 @@
   .skip-control.empty { display: none; }
   body:not(.show-skipped) .issue-card.skipped { display: none !important; }
 
+  /* Diff block */
+  .issue-card .card-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .issue-card .diff-block { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; max-height: 360px; overflow: auto; }
+  .issue-card .diff-block[hidden] { display: none; }
+  .issue-card .diff-block pre { background: transparent; padding: 0; margin: 0; font-size: 11px; line-height: 1.45; max-height: none; }
+  .issue-card .diff-line { display: block; padding: 0 4px; white-space: pre; word-break: normal; }
+  .issue-card .diff-line.diff-add { background: rgba(52,211,153,0.10); color: #6ee7b7; }
+  .issue-card .diff-line.diff-del { background: rgba(239,68,68,0.10); color: #fca5a5; }
+  .issue-card .diff-line.diff-hunk { color: var(--muted-2); margin-top: 4px; }
+  .issue-card .diff-line.diff-context { color: var(--muted); }
+  .issue-card .diff-truncated { color: var(--muted-2); font-size: 10px; padding: 4px; font-style: italic; }
+
   /* Treemap */
   .treemap-section { margin-bottom: 24px; }
   .treemap-section h3 { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; display: flex; align-items: center; gap: 10px; }
@@ -322,9 +334,30 @@
                 <div class="card-actions">
                   <button class="open-btn" data-target-path="{{source_path}}">Open source</button>
                   <button class="open-btn" data-target-path="{{target_path}}">Open target</button>
+                  {{#diff_is_identical}}
+                    <button class="diff-btn" disabled title="Source and target are byte-identical.">identical (no diff)</button>
+                  {{/diff_is_identical}}
+                  {{^diff_is_identical}}
+                    {{#diff_has_diff}}
+                      <button class="diff-btn">Show diff</button>
+                    {{/diff_has_diff}}
+                    {{^diff_has_diff}}
+                      <button class="diff-btn" disabled title="No textual differences detected.">no diff</button>
+                    {{/diff_has_diff}}
+                  {{/diff_is_identical}}
                   <button class="copy-fix-btn">Copy fix prompt</button>
+                  {{#diff_has_diff}}
+                    <button class="copy-fix-diff-btn">Copy prompt + diff</button>
+                  {{/diff_has_diff}}
                   <button class="skip-btn danger">Skip</button>
                 </div>
+                {{#diff_has_diff}}
+                  <div class="diff-block" hidden>
+                    <pre>{{#diff_lines}}<span class="diff-line diff-{{type}}">{{text}}</span>
+{{/diff_lines}}</pre>
+                    {{#diff_truncated}}<div class="diff-truncated">…truncated. Use --paths . and open the files for the full picture.</div>{{/diff_truncated}}
+                  </div>
+                {{/diff_has_diff}}
               </article>
             {{/issues}}
           {{/groups}}
@@ -637,6 +670,25 @@
     }, 1500);
   }
 
+  async function copyToClipboard(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text);
+      flashCopied(btn);
+    } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); flashCopied(btn); } catch (e2) {}
+      ta.remove();
+    }
+  }
+
+  function getCardDiffText(card) {
+    const pre = card.querySelector('.diff-block pre');
+    return pre ? pre.textContent.replace(/\n+$/, '') : '';
+  }
+
   document.querySelectorAll('#view-triage .issue-card').forEach(card => {
     card.querySelectorAll('.open-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -645,23 +697,33 @@
         if (path) window.location.href = `vscode://file${path}`;
       });
     });
+    const diffBtn = card.querySelector('.diff-btn');
+    const diffBlock = card.querySelector('.diff-block');
+    if (diffBtn && !diffBtn.disabled && diffBlock) {
+      diffBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = !diffBlock.hidden;
+        diffBlock.hidden = open;
+        diffBtn.textContent = open ? 'Show diff' : 'Hide diff';
+      });
+    }
     const copyBtn = card.querySelector('.copy-fix-btn');
     if (copyBtn) {
-      copyBtn.addEventListener('click', async (e) => {
+      copyBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const prompt = buildSingleFixPrompt(card);
-        try {
-          await navigator.clipboard.writeText(prompt);
-          flashCopied(copyBtn);
-        } catch (err) {
-          // Fallback: select+copy via a temp textarea
-          const ta = document.createElement('textarea');
-          ta.value = prompt;
-          document.body.appendChild(ta);
-          ta.select();
-          try { document.execCommand('copy'); flashCopied(copyBtn); } catch (e2) {}
-          ta.remove();
-        }
+        copyToClipboard(buildSingleFixPrompt(card), copyBtn);
+      });
+    }
+    const copyDiffBtn = card.querySelector('.copy-fix-diff-btn');
+    if (copyDiffBtn) {
+      copyDiffBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const base = buildSingleFixPrompt(card);
+        const diffText = getCardDiffText(card);
+        const combined = diffText
+          ? `${base}\n## Diff\n\n\`\`\`diff\n${diffText}\n\`\`\`\n`
+          : base;
+        copyToClipboard(combined, copyDiffBtn);
       });
     }
     const skipBtn = card.querySelector('.skip-btn');

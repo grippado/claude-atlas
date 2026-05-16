@@ -225,6 +225,62 @@ def test_frontmatter_preview_empty_returns_empty_list() -> None:
     assert _frontmatter_preview({}) == []
 
 
+def test_compute_issue_diff_identical_bodies() -> None:
+    from claude_atlas.report.renderer import _compute_issue_diff
+    a = _make_artifact("a", body="hello world")
+    b = _make_artifact("b", body="hello world")
+    a.frontmatter = {"name": "x"}
+    b.frontmatter = {"name": "x"}
+    diff = _compute_issue_diff(a, b, EdgeKind.DUPLICATE_EXACT.value)
+    assert diff["is_identical"] is True
+    assert diff["has_diff"] is False
+    assert diff["lines"] == []
+
+
+def test_compute_issue_diff_different_bodies_produces_lines() -> None:
+    from claude_atlas.report.renderer import _compute_issue_diff
+    a = _make_artifact("a", body="hello\nworld\n")
+    b = _make_artifact("b", body="hello\nuniverse\n")
+    diff = _compute_issue_diff(a, b, EdgeKind.DUPLICATE_SEMANTIC.value)
+    assert diff["is_identical"] is False
+    assert diff["has_diff"] is True
+    types = [line["type"] for line in diff["lines"]]
+    assert "add" in types
+    assert "del" in types
+    # Headers (--- / +++) should be filtered out
+    assert all("---" not in line["text"] and "+++" not in line["text"] for line in diff["lines"])
+
+
+def test_compute_issue_diff_frontmatter_changes_visible() -> None:
+    from claude_atlas.report.renderer import _compute_issue_diff
+    a = _make_artifact("a", body="same body")
+    b = _make_artifact("b", body="same body")
+    a.frontmatter = {"name": "a", "triggers": ["one", "two"]}
+    b.frontmatter = {"name": "a", "triggers": ["one", "three"]}
+    diff = _compute_issue_diff(a, b, EdgeKind.TRIGGER_COLLISION.value)
+    assert diff["has_diff"] is True
+    add_text = " ".join(line["text"] for line in diff["lines"] if line["type"] == "add")
+    del_text = " ".join(line["text"] for line in diff["lines"] if line["type"] == "del")
+    assert "three" in add_text
+    assert "two" in del_text
+
+
+def test_compute_issue_diff_truncates_long_diffs() -> None:
+    from claude_atlas.report.renderer import _compute_issue_diff
+    a = _make_artifact("a", body="\n".join(f"line {i}" for i in range(500)))
+    b = _make_artifact("b", body="\n".join(f"LINE {i}" for i in range(500)))
+    diff = _compute_issue_diff(a, b, EdgeKind.DUPLICATE_SEMANTIC.value)
+    assert diff["truncated"] is True
+    assert len(diff["lines"]) <= 120
+
+
+def test_compute_issue_diff_handles_none_artifacts() -> None:
+    from claude_atlas.report.renderer import _compute_issue_diff
+    diff = _compute_issue_diff(None, None, EdgeKind.DUPLICATE_SEMANTIC.value)
+    assert diff["has_diff"] is False
+    assert diff["lines"] == []
+
+
 def test_treemap_data_aggregates_by_scope_and_kind() -> None:
     from claude_atlas.models import ScanResult
     from claude_atlas.report.renderer import _treemap_data

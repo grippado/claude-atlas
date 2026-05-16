@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 from pathlib import Path
 
@@ -175,6 +176,109 @@ def _artifact_preview(artifact: object | None) -> dict:
     }
 
 
+_DIFF_MAX_LINES = 120
+
+
+def _serialize_frontmatter_for_diff(fm: dict | None) -> list[str]:
+    """Render frontmatter as sorted ``key: value`` lines for diffing."""
+    if not fm:
+        return []
+    out: list[str] = []
+    for key in sorted(fm.keys()):
+        value = fm[key]
+        if isinstance(value, list):
+            text = ", ".join(str(x) for x in value)
+        elif isinstance(value, dict):
+            text = ", ".join(f"{k}={v}" for k, v in value.items())
+        else:
+            text = str(value)
+        for line in text.splitlines() or [text]:
+            out.append(f"{key}: {line}")
+    return out
+
+
+def _classify_diff_line(line: str) -> str:
+    if line.startswith("+++") or line.startswith("---"):
+        return "header"
+    if line.startswith("@@"):
+        return "hunk"
+    if line.startswith("+"):
+        return "add"
+    if line.startswith("-"):
+        return "del"
+    return "context"
+
+
+def _compute_issue_diff(src: object | None, tgt: object | None, edge_kind: str) -> dict:
+    """
+    Build a unified diff between two artifacts for display.
+
+    Returns a dict with:
+      - is_identical: True when bodies + frontmatter are byte-identical.
+      - has_diff: True when there are any non-header diff lines.
+      - lines: list of {type, text} ready for the template.
+      - truncated: True if the diff was cut off at _DIFF_MAX_LINES.
+      - raw_text: full plain-text unified diff (used by the
+        "Copy fix prompt + diff" path so the prompt has the same view).
+    """
+    if src is None or tgt is None:
+        return {"is_identical": False, "has_diff": False, "lines": [], "truncated": False, "raw_text": ""}
+
+    src_fm = _serialize_frontmatter_for_diff(getattr(src, "frontmatter", None))
+    tgt_fm = _serialize_frontmatter_for_diff(getattr(tgt, "frontmatter", None))
+    src_body = (getattr(src, "body", "") or "").splitlines()
+    tgt_body = (getattr(tgt, "body", "") or "").splitlines()
+
+    src_combined = (
+        (["# frontmatter", *src_fm] if src_fm else [])
+        + (["", "# body"] if src_fm and src_body else [])
+        + src_body
+    )
+    tgt_combined = (
+        (["# frontmatter", *tgt_fm] if tgt_fm else [])
+        + (["", "# body"] if tgt_fm and tgt_body else [])
+        + tgt_body
+    )
+
+    if edge_kind == EdgeKind.DUPLICATE_EXACT.value and src_combined == tgt_combined:
+        return {"is_identical": True, "has_diff": False, "lines": [], "truncated": False, "raw_text": ""}
+
+    raw = list(difflib.unified_diff(
+        src_combined,
+        tgt_combined,
+        fromfile=getattr(src, "name", "source"),
+        tofile=getattr(tgt, "name", "target"),
+        lineterm="",
+        n=2,
+    ))
+
+    if not raw:
+        return {"is_identical": True, "has_diff": False, "lines": [], "truncated": False, "raw_text": ""}
+
+    truncated = False
+    if len(raw) > _DIFF_MAX_LINES:
+        raw = raw[:_DIFF_MAX_LINES]
+        truncated = True
+
+    lines: list[dict] = []
+    for line in raw:
+        cls = _classify_diff_line(line)
+        if cls == "header":
+            continue  # we already show source/target names in the card header
+        lines.append({"type": cls, "text": line})
+
+    raw_text = "\n".join(line["text"] for line in lines)
+    if truncated:
+        raw_text += f"\n... (truncated at {_DIFF_MAX_LINES} lines)"
+    return {
+        "is_identical": False,
+        "has_diff": any(line["type"] in ("add", "del") for line in lines),
+        "lines": lines,
+        "truncated": truncated,
+        "raw_text": raw_text,
+    }
+
+
 def _group_issues(result: ScanResult) -> list[dict]:
     by_id = {a.id: a for a in result.artifacts}
     issues = sorted(
@@ -192,7 +296,13 @@ def _group_issues(result: ScanResult) -> list[dict]:
         tgt_name = tgt.name if tgt else e.target
         src_preview = _artifact_preview(src)
         tgt_preview = _artifact_preview(tgt)
+        diff_info = _compute_issue_diff(src, tgt, e.kind.value)
         row = {
+            "diff_is_identical": diff_info["is_identical"],
+            "diff_has_diff": diff_info["has_diff"],
+            "diff_lines": diff_info["lines"],
+            "diff_truncated": diff_info["truncated"],
+            "diff_raw_text": diff_info["raw_text"],
             "edge_id": f"{e.source}::{e.target}::{e.kind.value}",
             "kind": kind,
             "severity": sev,
