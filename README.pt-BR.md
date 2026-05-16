@@ -179,7 +179,7 @@ Adicione ao seu `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/grippado/claude-atlas
-    rev: v0.5.0  # ou qualquer tag de https://github.com/grippado/claude-atlas/releases
+    rev: v0.5.1  # ou qualquer tag de https://github.com/grippado/claude-atlas/releases
     hooks:
       - id: claude-atlas           # falha só em HIGH severity
       # - id: claude-atlas-strict  # falha em MEDIUM e HIGH

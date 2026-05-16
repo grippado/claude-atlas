@@ -24,6 +24,7 @@ Guiam cada release. Também são a forma mais rápida de saber se uma feature pe
 | v0.3.0  | Comando `check` pra CI              | Output lint-style, exit codes, formatos text/json/github.                      |
 | v0.4.0  | Fundação backend                    | Health score, `check --since`, comando `fix`, templates de pre-commit.         |
 | v0.5.0  | HTML triage dashboard               | Triage view como default, previews lado a lado, ações por issue, treemap, grafo lazy. |
+| v0.5.1  | Botão de diff                       | `Show diff` por issue + `Copy prompt + diff` pra fixes mais afiados no Claude Code.   |
 
 ## Em consideração para v0.6.0+
 
