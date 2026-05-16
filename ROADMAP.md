@@ -1,6 +1,8 @@
 # Roadmap
 
 > **Languages:** [English](ROADMAP.md) · [Português 🇧🇷](ROADMAP.pt-BR.md)
+>
+> **Live tracker:** [GitHub Milestones](https://github.com/grippado/claude-atlas/milestones) — each bullet below links to its tracking issue.
 
 ## Principles
 
@@ -37,12 +39,12 @@ v0.4.0 inverts the priority: **the dashboard becomes the primary view; the graph
 
 ### What changes
 
-- **Triage view as the default.** Issues rendered as full cards in the main area, not a cramped sidebar list.
-- **Side-by-side preview.** Each issue card shows both artifacts' frontmatter and body excerpt next to each other, so you can compare without opening files.
-- **Health score.** A 0-100 number at the top, computed from issue count weighted by severity. Gives a quick sense of "is this getting better or worse over time".
-- **Per-issue actions.** Each card has `[skip]`, `[open in editor]`, and `[copy fix prompt]` buttons. Skip persists locally so you can dismiss known false-positives.
-- **Concentration overview.** A small treemap by scope → kind, sized by issue density. Replaces the graph as the at-a-glance "where are the problems concentrated?" answer.
-- **Graph as secondary tab.** Still available, still useful for exploring relationships. Just not the front door.
+- **Triage view as the default.** ([#9](https://github.com/grippado/claude-atlas/issues/9)) Issues rendered as full cards in the main area, not a cramped sidebar list.
+- **Side-by-side preview.** ([#10](https://github.com/grippado/claude-atlas/issues/10)) Each issue card shows both artifacts' frontmatter and body excerpt next to each other, so you can compare without opening files.
+- **Health score.** ([#8](https://github.com/grippado/claude-atlas/issues/8)) A 0-100 number at the top, computed from issue count weighted by severity. Gives a quick sense of "is this getting better or worse over time".
+- **Per-issue actions.** ([#11](https://github.com/grippado/claude-atlas/issues/11)) Each card has `[skip]`, `[open in editor]`, and `[copy fix prompt]` buttons. Skip persists locally so you can dismiss known false-positives.
+- **Concentration overview.** ([#12](https://github.com/grippado/claude-atlas/issues/12)) A small treemap by scope → kind, sized by issue density. Replaces the graph as the at-a-glance "where are the problems concentrated?" answer.
+- **Graph as secondary tab.** ([#13](https://github.com/grippado/claude-atlas/issues/13)) Still available, still useful for exploring relationships. Just not the front door.
 
 ### Wireframe
 
@@ -91,10 +93,10 @@ v0.4.0 inverts the priority: **the dashboard becomes the primary view; the graph
 
 Documented but uncommitted. Order is rough priority.
 
-- **`claude-atlas fix --interactive`** — terminal version of the `[copy fix prompt]` button. Pick issues, get a markdown prompt ready for Claude Code.
-- **Scan history / diff.** `claude-atlas check --since last` would show what changed in your setup since the previous run. Useful for "did my refactor make things better?".
-- **Pre-commit hook templates.** A `.pre-commit-hooks.yaml` so users add `claude-atlas check` to their repos with one line.
-- **Editor status bar plugin.** Tiny VS Code extension that runs `check --quiet` and shows the health score. Bonus: click to open the full HTML report.
+- **`claude-atlas fix --interactive`** ([#14](https://github.com/grippado/claude-atlas/issues/14)) — terminal version of the `[copy fix prompt]` button. Pick issues, get a markdown prompt ready for Claude Code.
+- **Scan history / diff.** ([#15](https://github.com/grippado/claude-atlas/issues/15)) `claude-atlas check --since last` would show what changed in your setup since the previous run. Useful for "did my refactor make things better?".
+- **Pre-commit hook templates.** ([#16](https://github.com/grippado/claude-atlas/issues/16)) A `.pre-commit-hooks.yaml` so users add `claude-atlas check` to their repos with one line.
+- **Editor status bar plugin.** ([#17](https://github.com/grippado/claude-atlas/issues/17)) Tiny VS Code extension that runs `check --quiet` and shows the health score. Bonus: click to open the full HTML report.
 
 ## Anti-roadmap (won't do)
 
