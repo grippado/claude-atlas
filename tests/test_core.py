@@ -184,7 +184,54 @@ def test_render_html_produces_file() -> None:
         assert out.is_file()
         content = out.read_text()
         assert "Claude Atlas" in content
-        assert "cytoscape" in content
+        # Cytoscape is lazy-loaded now: only the loader code is present
+        assert "cytoscape" in content.lower()
         assert "solo" in content
         assert "search" in content.lower()
         assert "Isolated" in content
+
+
+def test_frontmatter_preview_priority_order_and_truncation() -> None:
+    from claude_atlas.report.renderer import _frontmatter_preview
+    fm = {
+        "z_field": "zlast",
+        "description": "a" * 200,
+        "name": "myname",
+        "triggers": ["t1", "t2", "t3"],
+        "kind": "agent",
+        "scope": "global",
+        "extra1": "x",
+        "extra2": "y",
+    }
+    rows = _frontmatter_preview(fm)
+    keys = [r["key"] for r in rows]
+    # Priority keys come first in expected order
+    assert keys[:5] == ["name", "description", "kind", "scope", "triggers"]
+    # Description is truncated with ellipsis
+    desc_row = next(r for r in rows if r["key"] == "description")
+    assert desc_row["value"].endswith("…")
+    assert len(desc_row["value"]) <= 121
+    # Lists are flattened
+    trig_row = next(r for r in rows if r["key"] == "triggers")
+    assert trig_row["value"] == "t1, t2, t3"
+    # Last row is a "more" indicator since we have > 6 fields
+    assert rows[-1]["key"] == "…"
+    assert "more" in rows[-1]["value"]
+
+
+def test_frontmatter_preview_empty_returns_empty_list() -> None:
+    from claude_atlas.report.renderer import _frontmatter_preview
+    assert _frontmatter_preview(None) == []
+    assert _frontmatter_preview({}) == []
+
+
+def test_artifact_preview_includes_frontmatter_and_body() -> None:
+    from claude_atlas.report.renderer import _artifact_preview
+    a = _make_artifact("foo", description="bar")
+    a.frontmatter = {"name": "foo", "description": "bar"}
+    a.body = "hello world body content"
+    p = _artifact_preview(a)
+    assert p["has_frontmatter"] is True
+    assert p["has_body"] is True
+    assert p["body_excerpt"] == "hello world body content"
+    assert any(r["key"] == "name" for r in p["frontmatter"])

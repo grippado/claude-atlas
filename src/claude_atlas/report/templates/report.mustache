@@ -81,6 +81,18 @@
   .issue-card .card-paths code { background: var(--panel-2); padding: 1px 5px; border-radius: 3px; font-size: 10px; }
   .issue-card .card-detail { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .issue-card .card-fix { font-size: 12px; color: var(--accent); margin-top: 6px; line-height: 1.4; }
+  .issue-card .card-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .issue-card .preview-pane { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; min-width: 0; }
+  .issue-card .preview-pane .pane-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted-2); margin-bottom: 6px; word-break: break-all; }
+  .issue-card .preview-pane dl.fm { display: grid; grid-template-columns: minmax(60px, max-content) 1fr; gap: 2px 8px; font-size: 11px; margin: 0; }
+  .issue-card .preview-pane dl.fm dt { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .issue-card .preview-pane dl.fm dd { margin: 0; color: var(--text); word-break: break-word; overflow-wrap: anywhere; }
+  .issue-card .preview-pane .body-excerpt { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.45; white-space: pre-wrap; word-break: break-word; max-height: 80px; overflow: hidden; position: relative; }
+  .issue-card .preview-pane .body-excerpt.has-fade::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: linear-gradient(to bottom, transparent, var(--panel-2)); }
+  .issue-card .preview-pane .empty-pane { color: var(--muted-2); font-size: 11px; font-style: italic; }
+  @media (max-width: 720px) {
+    .issue-card .card-preview { grid-template-columns: 1fr; }
+  }
 
   .empty { color: var(--muted); text-align: center; padding: 60px 10px; font-size: 14px; }
   .empty .big { font-size: 32px; display: block; margin-bottom: 8px; }
@@ -214,6 +226,36 @@
                 </div>
                 <div class="card-detail">{{detail}}</div>
                 {{#fix}}<div class="card-fix">💡 {{fix}}</div>{{/fix}}
+                <div class="card-preview">
+                  <div class="preview-pane">
+                    <div class="pane-title">{{source_name}}</div>
+                    {{#source_has_frontmatter}}
+                      <dl class="fm">
+                        {{#source_frontmatter}}<dt>{{key}}</dt><dd>{{value}}</dd>{{/source_frontmatter}}
+                      </dl>
+                    {{/source_has_frontmatter}}
+                    {{^source_has_frontmatter}}
+                      <div class="empty-pane">(no frontmatter)</div>
+                    {{/source_has_frontmatter}}
+                    {{#source_has_body}}
+                      <div class="body-excerpt has-fade">{{source_body_excerpt}}</div>
+                    {{/source_has_body}}
+                  </div>
+                  <div class="preview-pane">
+                    <div class="pane-title">{{target_name}}</div>
+                    {{#target_has_frontmatter}}
+                      <dl class="fm">
+                        {{#target_frontmatter}}<dt>{{key}}</dt><dd>{{value}}</dd>{{/target_frontmatter}}
+                      </dl>
+                    {{/target_has_frontmatter}}
+                    {{^target_has_frontmatter}}
+                      <div class="empty-pane">(no frontmatter)</div>
+                    {{/target_has_frontmatter}}
+                    {{#target_has_body}}
+                      <div class="body-excerpt has-fade">{{target_body_excerpt}}</div>
+                    {{/target_has_body}}
+                  </div>
+                </div>
               </article>
             {{/issues}}
           {{/groups}}
