@@ -28,6 +28,47 @@ _KIND_LABELS = {
 }
 
 
+def _issue_identity(row: dict) -> str:
+    """Stable identity for an issue across scans. Uses paths + kind."""
+    return f"{row['source_path']}::{row['target_path']}::{row['kind']}"
+
+
+def compute_diff(rows: list[dict], previous: dict) -> dict:
+    """
+    Diff current issue rows against a previous snapshot dict.
+
+    ``previous`` should be the parsed JSON output of an earlier
+    ``check --top 0 --format json`` run. Issues are matched by
+    ``source_path::target_path::kind``.
+
+    Returns a dict with: ``new_issues``, ``resolved_issues``,
+    ``previous_health_score``, ``current_health_score``,
+    ``health_delta``. The health fields are ``None`` if the snapshot
+    predates v0.4 (no health_score key).
+    """
+    prev_issues = previous.get("issues") or []
+    prev_ids = {_issue_identity(r) for r in prev_issues if isinstance(r, dict)}
+    curr_ids = {_issue_identity(r) for r in rows}
+
+    new_rows = [r for r in rows if _issue_identity(r) not in prev_ids]
+    resolved_rows = [
+        r
+        for r in prev_issues
+        if isinstance(r, dict) and _issue_identity(r) not in curr_ids
+    ]
+
+    prev_summary = previous.get("summary") or {}
+    prev_score = prev_summary.get("health_score")
+
+    return {
+        "new_issues": new_rows,
+        "resolved_issues": resolved_rows,
+        "previous_health_score": prev_score,
+        "new_count": len(new_rows),
+        "resolved_count": len(resolved_rows),
+    }
+
+
 def _suggested_fix(edge_kind: str, src_name: str, tgt_name: str) -> str:
     if edge_kind == EdgeKind.DUPLICATE_EXACT.value:
         return "Delete one — keep the one in the narrower scope."
@@ -104,6 +145,21 @@ def _summary_line(
     )
 
 
+def _diff_line(diff: dict, current_health: int | None) -> str:
+    prev = diff["previous_health_score"]
+    if prev is not None and current_health is not None:
+        arrow = f"{prev}→{current_health}"
+        delta = current_health - prev
+        sign = "+" if delta > 0 else ""
+        health_part = f" Health {arrow} ({sign}{delta})."
+    else:
+        health_part = ""
+    return (
+        f"Since snapshot: +{diff['new_count']} new, "
+        f"-{diff['resolved_count']} resolved.{health_part}"
+    )
+
+
 def format_text(
     rows: list[dict],
     total_artifacts: int,
@@ -111,11 +167,18 @@ def format_text(
     quiet: bool,
     health_score: int | None = None,
     health_grade: str | None = None,
+    diff: dict | None = None,
 ) -> str:
     if quiet:
-        return _summary_line(rows, total_artifacts, health_score, health_grade)
+        line = _summary_line(rows, total_artifacts, health_score, health_grade)
+        if diff is not None:
+            line += " " + _diff_line(diff, health_score)
+        return line
     if not rows:
-        return _summary_line(rows, total_artifacts, health_score, health_grade)
+        line = _summary_line(rows, total_artifacts, health_score, health_grade)
+        if diff is not None:
+            line += " " + _diff_line(diff, health_score)
+        return line
     shown = rows if top == 0 else rows[:top]
     lines: list[str] = []
     for r in shown:
@@ -130,6 +193,8 @@ def format_text(
     if top > 0 and len(rows) > top:
         summary += f" Showing top {top}; pass --top 0 for all."
     lines.append(summary)
+    if diff is not None:
+        lines.append(_diff_line(diff, health_score))
     return "\n".join(lines)
 
 
@@ -140,9 +205,10 @@ def format_json(
     quiet: bool,
     health_score: int = 100,
     health_grade: str = "A",
+    diff: dict | None = None,
 ) -> str:
     counts = Counter(r["severity"] for r in rows)
-    payload = {
+    payload: dict = {
         "summary": {
             "total_issues": len(rows),
             "total_artifacts": total_artifacts,
@@ -156,6 +222,17 @@ def format_json(
         },
         "issues": [] if quiet else (rows if top == 0 else rows[:top]),
     }
+    if diff is not None:
+        prev = diff["previous_health_score"]
+        payload["since"] = {
+            "new_count": diff["new_count"],
+            "resolved_count": diff["resolved_count"],
+            "previous_health_score": prev,
+            "current_health_score": health_score,
+            "health_delta": (health_score - prev) if prev is not None else None,
+            "new_issues": diff["new_issues"],
+            "resolved_issues": diff["resolved_issues"],
+        }
     return json.dumps(payload, indent=2)
 
 
@@ -191,20 +268,32 @@ def run_check(
     top: int = 10,
     quiet: bool = False,
     stream: TextIO | None = None,
+    since: dict | None = None,
 ) -> int:
     """
     Run the check against a scan result. Returns the exit code.
     - 0: no issues at-or-above ``max_severity``
     - 1: issues at-or-above ``max_severity`` were found
+
+    If ``since`` is provided, it should be the parsed JSON of an earlier
+    ``check --top 0 --format json`` run. The output includes a diff of
+    new vs resolved issues and a health-score delta.
     """
     rows = _filter_and_sort_issues(result)
     total_artifacts = len(result.artifacts)
+    diff = compute_diff(rows, since) if since is not None else None
 
     score = result.health_score()
     grade = result.health_grade()
     if output_format == "json":
         output = format_json(
-            rows, total_artifacts, top, quiet, health_score=score, health_grade=grade
+            rows,
+            total_artifacts,
+            top,
+            quiet,
+            health_score=score,
+            health_grade=grade,
+            diff=diff,
         )
     elif output_format == "github":
         output = format_github(
@@ -212,7 +301,13 @@ def run_check(
         )
     else:
         output = format_text(
-            rows, total_artifacts, top, quiet, health_score=score, health_grade=grade
+            rows,
+            total_artifacts,
+            top,
+            quiet,
+            health_score=score,
+            health_grade=grade,
+            diff=diff,
         )
 
     out = stream if stream is not None else sys.stdout

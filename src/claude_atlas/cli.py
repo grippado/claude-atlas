@@ -131,6 +131,12 @@ def check(
         False, "--quiet", "-q",
         help="Only print summary line; suppress per-issue details.",
     ),
+    since: Path = typer.Option(
+        None, "--since",
+        help="Diff against a previous snapshot (a JSON file written by "
+             "`check --top 0 --format json`). Surfaces new vs resolved issues "
+             "and a health-score delta.",
+    ),
 ) -> None:
     """
     Lint-style health check of your Claude Code setup.
@@ -144,6 +150,8 @@ def check(
       claude-atlas check --format github             # for GitHub Actions
       claude-atlas check --top 0 --format json       # everything as JSON
       claude-atlas check --quiet                     # one-line summary only
+      claude-atlas check --top 0 --format json > /tmp/snap.json
+      claude-atlas check --since /tmp/snap.json      # diff vs previous run
     """
     valid_severities = {s.value for s in Severity}
     if max_severity not in valid_severities:
@@ -166,6 +174,19 @@ def check(
     paths = paths or []
     auto_discover = auto_discover or []
 
+    since_data: dict | None = None
+    if since is not None:
+        try:
+            import json as _json
+            since_data = _json.loads(since.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            console.print(
+                f"[bold red]error:[/bold red] could not read --since snapshot "
+                f"{since}: {e}",
+                highlight=False,
+            )
+            raise typer.Exit(2) from e
+
     try:
         result = _run_scan(
             paths=paths, no_global=no_global, auto_discover=auto_discover,
@@ -181,6 +202,7 @@ def check(
         output_format=output_format,
         top=top,
         quiet=quiet,
+        since=since_data,
     )
     raise typer.Exit(exit_code)
 
