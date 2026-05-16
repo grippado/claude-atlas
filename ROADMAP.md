@@ -25,6 +25,7 @@ These guide every release. They're also the easiest way to know if a feature req
 | v0.4.0  | Backend foundation                   | Health score, `check --since` diff, `fix` command, pre-commit hook templates.    |
 | v0.5.0  | HTML triage dashboard                | Triage view as default, side-by-side previews, per-issue actions, treemap, lazy graph. |
 | v0.5.1  | Diff button                          | Per-issue `Show diff` + `Copy prompt + diff` for sharper Claude Code fixes.      |
+| v0.5.2  | Symlink dedupe                       | Scanner dedupes artifacts by real path, killing false-positive duplicates from symlinks. |
 
 ## Considering for v0.6.0+
 

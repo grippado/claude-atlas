@@ -25,6 +25,7 @@ Guiam cada release. Também são a forma mais rápida de saber se uma feature pe
 | v0.4.0  | Fundação backend                    | Health score, `check --since`, comando `fix`, templates de pre-commit.         |
 | v0.5.0  | HTML triage dashboard               | Triage view como default, previews lado a lado, ações por issue, treemap, grafo lazy. |
 | v0.5.1  | Botão de diff                       | `Show diff` por issue + `Copy prompt + diff` pra fixes mais afiados no Claude Code.   |
+| v0.5.2  | Dedupe de symlinks                  | Scanner deduplica artefatos por real path, matando falsos positivos de duplicatas por symlink. |
 
 ## Em consideração para v0.6.0+
 
