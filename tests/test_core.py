@@ -225,6 +225,49 @@ def test_frontmatter_preview_empty_returns_empty_list() -> None:
     assert _frontmatter_preview({}) == []
 
 
+def test_treemap_data_aggregates_by_scope_and_kind() -> None:
+    from claude_atlas.models import ScanResult
+    from claude_atlas.report.renderer import _treemap_data
+    a = _make_artifact("a", kind=ArtifactKind.AGENT)
+    b = _make_artifact("b", kind=ArtifactKind.AGENT)
+    c = _make_artifact("c", kind=ArtifactKind.SKILL)
+    a.scope = Scope.GLOBAL
+    b.scope = Scope.GLOBAL
+    c.scope = Scope.PROJECT
+    result = ScanResult(artifacts=[a, b, c], edges=[], roots_scanned=[Path("/tmp")])
+    cells = _treemap_data(result)
+    by_key = {(c["scope"], c["kind"]): c for c in cells}
+    assert by_key[("global", "agent")]["count"] == 2
+    assert by_key[("project", "skill")]["count"] == 1
+    # No issues → muted color
+    for cell in cells:
+        assert cell["has_issue"] is False
+    # Coordinates sum to 100 across horizontal axis (global agent cell + project skill cell)
+    total_w = sum(c["w"] for c in cells if c["kind"] == "agent") + sum(
+        c["w"] for c in cells if c["scope"] == "project"
+    )
+    assert abs(total_w - 100.0) < 0.5
+
+
+def test_treemap_data_colors_buckets_with_issues() -> None:
+    from claude_atlas.models import Edge, ScanResult
+    from claude_atlas.report.renderer import _treemap_data
+    a = _make_artifact("a", kind=ArtifactKind.AGENT)
+    b = _make_artifact("b", kind=ArtifactKind.AGENT)
+    a.scope = Scope.GLOBAL
+    b.scope = Scope.GLOBAL
+    edge = Edge(
+        source=a.id, target=b.id, kind=EdgeKind.DUPLICATE_EXACT,
+        severity=Severity.HIGH, detail="dup",
+    )
+    result = ScanResult(artifacts=[a, b], edges=[edge], roots_scanned=[Path("/tmp")])
+    cells = _treemap_data(result)
+    global_agent = next(c for c in cells if c["scope"] == "global" and c["kind"] == "agent")
+    assert global_agent["has_issue"] is True
+    assert global_agent["color"] == "#ef4444"  # high
+    assert global_agent["severity_rank"] == 3
+
+
 def test_artifact_preview_includes_frontmatter_and_body() -> None:
     from claude_atlas.report.renderer import _artifact_preview
     a = _make_artifact("foo", description="bar")

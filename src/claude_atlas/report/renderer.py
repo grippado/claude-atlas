@@ -199,6 +199,10 @@ def _group_issues(result: ScanResult) -> list[dict]:
             "source_id": e.source,
             "source_name": src_name,
             "source_path": str(src.path) if src else "",
+            "source_scope": src.scope.value if src else "",
+            "source_kind": src.kind.value if src else "",
+            "target_scope": tgt.scope.value if tgt else "",
+            "target_kind": tgt.kind.value if tgt else "",
             "source_frontmatter": src_preview["frontmatter"],
             "source_body_excerpt": src_preview["body_excerpt"],
             "source_has_frontmatter": src_preview["has_frontmatter"],
@@ -236,6 +240,95 @@ def _group_issues(result: ScanResult) -> list[dict]:
     return out
 
 
+_SEVERITY_RANK_FOR_TREEMAP = {
+    Severity.HIGH.value: 3,
+    Severity.MEDIUM.value: 2,
+    Severity.LOW.value: 1,
+    Severity.NONE.value: 0,
+}
+
+
+def _treemap_cell_color(rank: int) -> str:
+    return {
+        3: "#ef4444",  # high
+        2: "#f97316",  # medium
+        1: "#eab308",  # low
+    }.get(rank, "#334155")  # no issues touching this bucket
+
+
+def _treemap_data(result: ScanResult) -> list[dict]:
+    """
+    Aggregate artifacts by (scope, kind) into a treemap-ready layout.
+
+    Layout: scopes are horizontal slabs sized by total artifact count
+    in each scope; within a slab, kinds are vertical slabs sized by
+    count per kind. Output is in 0..100 viewBox coordinates.
+
+    Color: each cell's max severity across all issues that touch any
+    artifact in that bucket. Buckets with no issues get a muted color.
+    """
+    buckets: dict[tuple[str, str], int] = {}
+    bucket_sev_rank: dict[tuple[str, str], int] = {}
+
+    artifact_bucket: dict[str, tuple[str, str]] = {}
+    for a in result.artifacts:
+        key = (a.scope.value, a.kind.value)
+        buckets[key] = buckets.get(key, 0) + 1
+        artifact_bucket[a.id] = key
+
+    for e in result.issues:
+        rank = _SEVERITY_RANK_FOR_TREEMAP.get(e.severity.value, 0)
+        for endpoint in (e.source, e.target):
+            key = artifact_bucket.get(endpoint)
+            if key is None:
+                continue
+            if rank > bucket_sev_rank.get(key, 0):
+                bucket_sev_rank[key] = rank
+
+    if not buckets:
+        return []
+
+    by_scope: dict[str, list[tuple[str, int]]] = {}
+    for (scope, kind), count in buckets.items():
+        by_scope.setdefault(scope, []).append((kind, count))
+
+    scopes_sorted = sorted(
+        by_scope.items(),
+        key=lambda item: -sum(c for _, c in item[1]),
+    )
+    total = sum(buckets.values())
+
+    cells: list[dict] = []
+    x = 0.0
+    for scope, kind_counts in scopes_sorted:
+        scope_total = sum(c for _, c in kind_counts)
+        w = (scope_total / total) * 100 if total else 0
+        # Vertical stack of kinds within this scope's column
+        kind_counts.sort(key=lambda kc: -kc[1])
+        y = 0.0
+        for kind, count in kind_counts:
+            h = (count / scope_total) * 100 if scope_total else 0
+            rank = bucket_sev_rank.get((scope, kind), 0)
+            cells.append({
+                "scope": scope,
+                "kind": kind,
+                "count": count,
+                "x": round(x, 3),
+                "y": round(y, 3),
+                "w": round(w, 3),
+                "h": round(h, 3),
+                "color": _treemap_cell_color(rank),
+                "has_issue": rank > 0,
+                "severity_rank": rank,
+                "label": f"{scope} · {kind}" if w > 12 else kind,
+                "show_label": w > 8 and h > 14,
+                "show_count": w > 6 and h > 8,
+            })
+            y += h
+        x += w
+    return cells
+
+
 def _orphan_list(result: ScanResult) -> list[dict]:
     connected: set[str] = set()
     for e in result.edges:
@@ -263,6 +356,7 @@ def render_html(result: ScanResult, output_path: Path) -> Path:
     stats = result.stats()
     issue_groups = _group_issues(result)
     orphans = _orphan_list(result)
+    treemap = _treemap_data(result)
 
     stats_rows = [{"key": k, "value": v} for k, v in sorted(stats.items())]
 
@@ -291,6 +385,8 @@ def render_html(result: ScanResult, output_path: Path) -> Path:
             "health_color": health_color,
             "issue_singular": stats.get("issues_total", 0) == 1,
             "orphans_singular": len(orphans) == 1,
+            "treemap_cells": treemap,
+            "has_treemap": bool(treemap),
         },
     )
 

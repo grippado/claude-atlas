@@ -107,6 +107,23 @@
   .skip-control.empty { display: none; }
   body:not(.show-skipped) .issue-card.skipped { display: none !important; }
 
+  /* Treemap */
+  .treemap-section { margin-bottom: 24px; }
+  .treemap-section h3 { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; display: flex; align-items: center; gap: 10px; }
+  .treemap-section h3 .clear-filter { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; font-size: 10px; cursor: pointer; font-family: inherit; }
+  .treemap-section h3 .clear-filter[hidden] { display: none; }
+  .treemap-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+  svg#treemap { width: 100%; height: 120px; display: block; }
+  svg#treemap rect.cell { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; transition: opacity 0.1s; }
+  svg#treemap rect.cell:hover { stroke: var(--text); stroke-width: 2; }
+  svg#treemap rect.cell.dimmed { opacity: 0.25; }
+  svg#treemap rect.cell.selected { stroke: #fef08a; stroke-width: 2.5; }
+  svg#treemap text { fill: #0b1020; font-size: 10px; font-weight: 600; pointer-events: none; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  svg#treemap text.count { font-size: 11px; }
+  .treemap-legend { font-size: 10px; color: var(--muted-2); margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .treemap-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .treemap-legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
+
   .empty { color: var(--muted); text-align: center; padding: 60px 10px; font-size: 14px; }
   .empty .big { font-size: 32px; display: block; margin-bottom: 8px; }
 
@@ -220,6 +237,38 @@
       </span>
     </div>
 
+    {{#has_treemap}}
+      <section class="treemap-section">
+        <h3>
+          <span>Concentration <span style="color: var(--muted-2); font-weight: normal; text-transform: none; letter-spacing: 0;">— size = artifact count · color = max severity in that bucket</span></span>
+          <button class="clear-filter" id="clear-treemap-filter" hidden>Clear filter</button>
+        </h3>
+        <div class="treemap-wrap">
+          <svg id="treemap" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {{#treemap_cells}}
+              <rect class="cell" data-scope="{{scope}}" data-kind="{{kind}}"
+                    x="{{x}}" y="{{y}}" width="{{w}}" height="{{h}}"
+                    fill="{{color}}">
+                <title>{{scope}} · {{kind}}: {{count}} artifact(s){{#has_issue}} · has issues{{/has_issue}}</title>
+              </rect>
+              {{#show_count}}
+                <text x="{{x}}" y="{{y}}" dx="4" dy="11" class="count">{{count}}</text>
+              {{/show_count}}
+              {{#show_label}}
+                <text x="{{x}}" y="{{y}}" dx="4" dy="22">{{label}}</text>
+              {{/show_label}}
+            {{/treemap_cells}}
+          </svg>
+          <div class="treemap-legend">
+            <span><span class="swatch" style="background:#ef4444"></span>high severity</span>
+            <span><span class="swatch" style="background:#f97316"></span>medium</span>
+            <span><span class="swatch" style="background:#eab308"></span>low</span>
+            <span><span class="swatch" style="background:#334155"></span>no issues</span>
+          </div>
+        </div>
+      </section>
+    {{/has_treemap}}
+
     {{#has_issues}}
       {{#issue_groups}}
         <section class="sev-section" data-sev-section="{{severity}}">
@@ -230,7 +279,7 @@
           </h3>
           {{#groups}}
             {{#issues}}
-              <article class="issue-card sev-border-{{severity}}" data-edge-id="{{edge_id}}" data-source="{{source_id}}" data-target="{{target_id}}" data-sev="{{severity}}">
+              <article class="issue-card sev-border-{{severity}}" data-edge-id="{{edge_id}}" data-source="{{source_id}}" data-target="{{target_id}}" data-sev="{{severity}}" data-source-scope="{{source_scope}}" data-source-kind="{{source_kind}}" data-target-scope="{{target_scope}}" data-target-kind="{{target_kind}}">
                 <div class="card-header">
                   <span class="kind-badge">{{kind}}</span>
                   <span class="sev-badge sev-{{severity}}">{{severity_upper}}</span>
@@ -633,6 +682,43 @@
 
   refreshSkipUI();
 
+  // --- Treemap interactions ---
+  const treemapSvg = document.getElementById('treemap');
+  const clearTreemapBtn = document.getElementById('clear-treemap-filter');
+  if (treemapSvg) {
+    treemapSvg.querySelectorAll('rect.cell').forEach(rect => {
+      rect.addEventListener('click', () => {
+        const scope = rect.dataset.scope;
+        const kind = rect.dataset.kind;
+        if (treemapFilter && treemapFilter.scope === scope && treemapFilter.kind === kind) {
+          treemapFilter = null;
+        } else {
+          treemapFilter = { scope, kind };
+        }
+        treemapSvg.querySelectorAll('rect.cell').forEach(r => {
+          r.classList.remove('selected', 'dimmed');
+          if (treemapFilter) {
+            if (r.dataset.scope === treemapFilter.scope && r.dataset.kind === treemapFilter.kind) {
+              r.classList.add('selected');
+            } else {
+              r.classList.add('dimmed');
+            }
+          }
+        });
+        if (clearTreemapBtn) clearTreemapBtn.hidden = !treemapFilter;
+        applyFilters();
+      });
+    });
+  }
+  if (clearTreemapBtn) {
+    clearTreemapBtn.addEventListener('click', () => {
+      treemapFilter = null;
+      if (treemapSvg) treemapSvg.querySelectorAll('rect.cell').forEach(r => r.classList.remove('selected', 'dimmed'));
+      clearTreemapBtn.hidden = true;
+      applyFilters();
+    });
+  }
+
   // --- Triage card click (anywhere outside action buttons) ---
   document.querySelectorAll('#view-triage .issue-card').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -666,19 +752,37 @@
     cy.animate({ fit: { eles: src.union(tgt), padding: 150 }, duration: 300 });
   }
 
+  // --- Treemap filter state ---
+  let treemapFilter = null; // {scope, kind} or null
+
+  function cardMatchesTreemap(card) {
+    if (!treemapFilter) return true;
+    const { scope, kind } = treemapFilter;
+    return (
+      (card.dataset.sourceScope === scope && card.dataset.sourceKind === kind) ||
+      (card.dataset.targetScope === scope && card.dataset.targetKind === kind)
+    );
+  }
+
   // --- Filters ---
   function applyFilters() {
     const activeSevs = new Set(
       Array.from(document.querySelectorAll('.filters input[data-sev]:checked')).map(el => el.dataset.sev)
     );
 
-    // Triage: hide cards whose severity is not active. Hide entire sev-sections if all hidden.
+    // Triage: hide cards whose severity is not active OR don't match treemap filter
     document.querySelectorAll('#view-triage .issue-card').forEach(card => {
-      card.style.display = activeSevs.has(card.dataset.sev) ? '' : 'none';
+      const show = activeSevs.has(card.dataset.sev) && cardMatchesTreemap(card);
+      card.style.display = show ? '' : 'none';
     });
+    // Hide a sev-section if all its visible-eligible cards are filtered out
     document.querySelectorAll('#view-triage .sev-section').forEach(sec => {
       const sev = sec.dataset.sevSection;
-      sec.style.display = activeSevs.has(sev) ? '' : 'none';
+      if (!activeSevs.has(sev)) { sec.style.display = 'none'; return; }
+      const anyVisible = Array.from(sec.querySelectorAll('.issue-card')).some(
+        c => c.style.display !== 'none'
+      );
+      sec.style.display = anyVisible ? '' : 'none';
     });
 
     // Graph (only if cy is loaded)
