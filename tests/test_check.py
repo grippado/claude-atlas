@@ -8,6 +8,7 @@ from pathlib import Path
 
 from claude_atlas.check import (
     _meets_threshold,
+    compute_diff,
     format_github,
     format_json,
     format_text,
@@ -294,3 +295,85 @@ def test_run_check_text_mentions_health() -> None:
     out = io.StringIO()
     run_check(result, output_format="text", stream=out)
     assert "Health: 86/100 (B)" in out.getvalue()
+
+
+def _snapshot_from_rows(rows: list[dict], health_score: int = 86) -> dict:
+    return {
+        "summary": {
+            "total_issues": len(rows),
+            "total_artifacts": 6,
+            "health_score": health_score,
+            "health_grade": "B",
+        },
+        "issues": rows,
+    }
+
+
+def _row(source: str, target: str, kind: str, severity: str = "high") -> dict:
+    return {
+        "severity": severity,
+        "severity_rank": 3,
+        "kind": kind,
+        "kind_label": kind,
+        "source_name": source,
+        "source_path": f"/tmp/{source}.md",
+        "target_name": target,
+        "target_path": f"/tmp/{target}.md",
+        "detail": "x",
+        "weight": 1.0,
+        "fix": "",
+    }
+
+
+def test_compute_diff_identifies_new_and_resolved() -> None:
+    previous_rows = [
+        _row("a", "b", "duplicate_exact"),
+        _row("c", "d", "duplicate_semantic", "medium"),
+    ]
+    current_rows = [
+        _row("a", "b", "duplicate_exact"),       # unchanged
+        _row("e", "f", "trigger_collision", "low"),  # new
+    ]
+    diff = compute_diff(current_rows, _snapshot_from_rows(previous_rows))
+    assert diff["new_count"] == 1
+    assert diff["resolved_count"] == 1
+    assert diff["new_issues"][0]["source_path"] == "/tmp/e.md"
+    assert diff["resolved_issues"][0]["source_path"] == "/tmp/c.md"
+    assert diff["previous_health_score"] == 86
+
+
+def test_compute_diff_handles_snapshot_without_health() -> None:
+    # Pre-v0.4 snapshots may not have health_score
+    snap = {"summary": {"total_issues": 0}, "issues": []}
+    diff = compute_diff([_row("a", "b", "duplicate_exact")], snap)
+    assert diff["previous_health_score"] is None
+    assert diff["new_count"] == 1
+
+
+def test_run_check_since_includes_diff_in_json() -> None:
+    result = _mk_result_with_issues()
+    # Snapshot where only the high duplicate existed before
+    snapshot = _snapshot_from_rows(
+        [_row("a", "b", "duplicate_exact")], health_score=90
+    )
+    out = io.StringIO()
+    run_check(result, output_format="json", stream=out, since=snapshot)
+    parsed = json.loads(out.getvalue())
+    assert "since" in parsed
+    assert parsed["since"]["previous_health_score"] == 90
+    assert parsed["since"]["current_health_score"] == 86
+    assert parsed["since"]["health_delta"] == -4
+    assert parsed["since"]["new_count"] == 2  # medium + low were new
+    assert parsed["since"]["resolved_count"] == 0
+
+
+def test_run_check_since_renders_text_diff_line() -> None:
+    result = _mk_result_with_issues()
+    snapshot = _snapshot_from_rows(
+        [_row("a", "b", "duplicate_exact")], health_score=90
+    )
+    out = io.StringIO()
+    run_check(result, output_format="text", stream=out, since=snapshot)
+    text = out.getvalue()
+    assert "Since snapshot: +2 new, -0 resolved." in text
+    assert "Health 90→86 (-4)." in text

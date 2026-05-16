@@ -141,6 +141,22 @@ claude-atlas check --top 0 --format json
 
 Exit codes: `0` (clean), `1` (issues found at threshold), `2` (error).
 
+### Track health over time
+
+`--since` diffs the current scan against a previous snapshot you wrote yourself — no state directory, no telemetry, just two JSON files:
+
+```bash
+# Today: save a snapshot
+claude-atlas check --top 0 --format json > /tmp/atlas-snap.json
+
+# Tomorrow (after some refactoring): see what changed
+claude-atlas check --since /tmp/atlas-snap.json
+# → Found 9 issues (...) in 93 artifacts. Health: 82/100 (B).
+#   Since snapshot: +1 new, -4 resolved. Health 75→82 (+7).
+```
+
+Useful before/after big refactors to confirm you actually moved the needle.
+
 ### As a [pre-commit](https://pre-commit.com) hook
 
 Add to your `.pre-commit-config.yaml`:

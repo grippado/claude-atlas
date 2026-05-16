@@ -141,6 +141,22 @@ claude-atlas check --top 0 --format json
 
 Exit codes: `0` (limpo), `1` (issues encontradas no threshold), `2` (erro).
 
+### Acompanhar a saúde ao longo do tempo
+
+`--since` faz diff do scan atual contra um snapshot que você mesmo gravou — sem diretório de estado, sem telemetria, só dois arquivos JSON:
+
+```bash
+# Hoje: salva um snapshot
+claude-atlas check --top 0 --format json > /tmp/atlas-snap.json
+
+# Amanhã (depois de refatorar): veja o que mudou
+claude-atlas check --since /tmp/atlas-snap.json
+# → Found 9 issues (...) in 93 artifacts. Health: 82/100 (B).
+#   Since snapshot: +1 new, -4 resolved. Health 75→82 (+7).
+```
+
+Útil antes/depois de refactors grandes pra confirmar que você realmente mexeu o ponteiro.
+
 ### Como hook do [pre-commit](https://pre-commit.com)
 
 Adicione ao seu `.pre-commit-config.yaml`:
