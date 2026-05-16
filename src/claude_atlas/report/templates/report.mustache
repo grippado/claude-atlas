@@ -113,14 +113,15 @@
   .treemap-section h3 .clear-filter { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; font-size: 10px; cursor: pointer; font-family: inherit; }
   .treemap-section h3 .clear-filter[hidden] { display: none; }
   .treemap-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
-  svg#treemap { width: 100%; height: 120px; display: block; }
-  svg#treemap rect.cell { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; transition: opacity 0.1s; }
-  svg#treemap rect.cell:hover { stroke: var(--text); stroke-width: 2; }
-  svg#treemap rect.cell.dimmed { opacity: 0.25; }
-  svg#treemap rect.cell.selected { stroke: #fef08a; stroke-width: 2.5; }
-  svg#treemap text { fill: #0b1020; font-size: 10px; font-weight: 600; pointer-events: none; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-  svg#treemap text.count { font-size: 11px; }
-  .treemap-legend { font-size: 10px; color: var(--muted-2); margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .treemap { position: relative; width: 100%; height: 140px; }
+  .treemap-cell { position: absolute; box-sizing: border-box; border: 1.5px solid var(--bg); cursor: pointer; transition: opacity 0.1s, border-color 0.1s; padding: 4px 6px; overflow: hidden; color: #0b1020; }
+  .treemap-cell:hover { border-color: var(--text); }
+  .treemap-cell.dimmed { opacity: 0.25; }
+  .treemap-cell.selected { border-color: #fef08a; border-width: 2.5px; }
+  .treemap-cell .cell-count { font-size: 11px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .treemap-cell .cell-label { font-size: 10px; font-weight: 500; line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .treemap-cell.no-issues { color: var(--muted); }
+  .treemap-legend { font-size: 10px; color: var(--muted-2); margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
   .treemap-legend span { display: inline-flex; align-items: center; gap: 4px; }
   .treemap-legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
 
@@ -244,21 +245,17 @@
           <button class="clear-filter" id="clear-treemap-filter" hidden>Clear filter</button>
         </h3>
         <div class="treemap-wrap">
-          <svg id="treemap" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <div class="treemap" id="treemap">
             {{#treemap_cells}}
-              <rect class="cell" data-scope="{{scope}}" data-kind="{{kind}}"
-                    x="{{x}}" y="{{y}}" width="{{w}}" height="{{h}}"
-                    fill="{{color}}">
-                <title>{{scope}} · {{kind}}: {{count}} artifact(s){{#has_issue}} · has issues{{/has_issue}}</title>
-              </rect>
-              {{#show_count}}
-                <text x="{{x}}" y="{{y}}" dx="4" dy="11" class="count">{{count}}</text>
-              {{/show_count}}
-              {{#show_label}}
-                <text x="{{x}}" y="{{y}}" dx="4" dy="22">{{label}}</text>
-              {{/show_label}}
+              <div class="treemap-cell{{^has_issue}} no-issues{{/has_issue}}"
+                   data-scope="{{scope}}" data-kind="{{kind}}"
+                   style="left:{{x}}%; top:{{y}}%; width:{{w}}%; height:{{h}}%; background:{{color}};"
+                   title="{{scope}} · {{kind}}: {{count}} artifact(s)">
+                {{#show_count}}<div class="cell-count">{{count}}</div>{{/show_count}}
+                {{#show_label}}<div class="cell-label">{{label}}</div>{{/show_label}}
+              </div>
             {{/treemap_cells}}
-          </svg>
+          </div>
           <div class="treemap-legend">
             <span><span class="swatch" style="background:#ef4444"></span>high severity</span>
             <span><span class="swatch" style="background:#f97316"></span>medium</span>
@@ -683,25 +680,25 @@
   refreshSkipUI();
 
   // --- Treemap interactions ---
-  const treemapSvg = document.getElementById('treemap');
+  const treemapEl = document.getElementById('treemap');
   const clearTreemapBtn = document.getElementById('clear-treemap-filter');
-  if (treemapSvg) {
-    treemapSvg.querySelectorAll('rect.cell').forEach(rect => {
-      rect.addEventListener('click', () => {
-        const scope = rect.dataset.scope;
-        const kind = rect.dataset.kind;
+  if (treemapEl) {
+    treemapEl.querySelectorAll('.treemap-cell').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const scope = cell.dataset.scope;
+        const kind = cell.dataset.kind;
         if (treemapFilter && treemapFilter.scope === scope && treemapFilter.kind === kind) {
           treemapFilter = null;
         } else {
           treemapFilter = { scope, kind };
         }
-        treemapSvg.querySelectorAll('rect.cell').forEach(r => {
-          r.classList.remove('selected', 'dimmed');
+        treemapEl.querySelectorAll('.treemap-cell').forEach(c => {
+          c.classList.remove('selected', 'dimmed');
           if (treemapFilter) {
-            if (r.dataset.scope === treemapFilter.scope && r.dataset.kind === treemapFilter.kind) {
-              r.classList.add('selected');
+            if (c.dataset.scope === treemapFilter.scope && c.dataset.kind === treemapFilter.kind) {
+              c.classList.add('selected');
             } else {
-              r.classList.add('dimmed');
+              c.classList.add('dimmed');
             }
           }
         });
@@ -713,7 +710,7 @@
   if (clearTreemapBtn) {
     clearTreemapBtn.addEventListener('click', () => {
       treemapFilter = null;
-      if (treemapSvg) treemapSvg.querySelectorAll('rect.cell').forEach(r => r.classList.remove('selected', 'dimmed'));
+      if (treemapEl) treemapEl.querySelectorAll('.treemap-cell').forEach(c => c.classList.remove('selected', 'dimmed'));
       clearTreemapBtn.hidden = true;
       applyFilters();
     });
