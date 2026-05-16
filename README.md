@@ -141,6 +141,21 @@ claude-atlas check --top 0 --format json
 
 Exit codes: `0` (clean), `1` (issues found at threshold), `2` (error).
 
+### As a [pre-commit](https://pre-commit.com) hook
+
+Add to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/grippado/claude-atlas
+    rev: v0.3.1  # or any tag from https://github.com/grippado/claude-atlas/releases
+    hooks:
+      - id: claude-atlas           # fails only on HIGH severity
+      # - id: claude-atlas-strict  # fails on MEDIUM and HIGH
+```
+
+Both hooks run `claude-atlas check --quiet` against your repo's `.claude/` directory on every commit.
+
 ## Project layout
 
 ```

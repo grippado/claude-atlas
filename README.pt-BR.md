@@ -141,6 +141,21 @@ claude-atlas check --top 0 --format json
 
 Exit codes: `0` (limpo), `1` (issues encontradas no threshold), `2` (erro).
 
+### Como hook do [pre-commit](https://pre-commit.com)
+
+Adicione ao seu `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/grippado/claude-atlas
+    rev: v0.3.1  # ou qualquer tag de https://github.com/grippado/claude-atlas/releases
+    hooks:
+      - id: claude-atlas           # falha só em HIGH severity
+      # - id: claude-atlas-strict  # falha em MEDIUM e HIGH
+```
+
+Os dois hooks rodam `claude-atlas check --quiet` contra o diretório `.claude/` do seu repo a cada commit.
+
 ## Roadmap
 
 Claude-atlas está em evolução ativa. Veja o [ROADMAP.pt-BR.md](ROADMAP.pt-BR.md) completo com princípios, versões lançadas e o que está planejado.
