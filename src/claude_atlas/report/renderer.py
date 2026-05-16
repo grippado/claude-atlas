@@ -221,6 +221,8 @@ def render_html(result: ScanResult, output_path: Path) -> Path:
             "health_score": score,
             "health_grade": grade,
             "health_color": health_color,
+            "issue_singular": stats.get("issues_total", 0) == 1,
+            "orphans_singular": len(orphans) == 1,
         },
     )
 
